@@ -1,0 +1,9 @@
+{
+  "key.category.farmhelperhypixel.main": "FarmHelperHypixel",
+  "key.farmhelperhypixel.toggle": "Toggle farm mode",
+  "key.farmhelperhypixel.home": "Send /home in farm mode",
+  "message.farmhelperhypixel.enabled": "FarmHelperHypixel: farm mode enabled",
+  "message.farmhelperhypixel.disabled": "FarmHelperHypixel: controls restored",
+  "message.farmhelperhypixel.attack_on": "FarmHelperHypixel: breaking enabled",
+  "message.farmhelperhypixel.attack_off": "FarmHelperHypixel: breaking disabled"
+}

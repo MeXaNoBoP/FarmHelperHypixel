@@ -1,0 +1,9 @@
+{
+  "key.category.farmhelperhypixel.main": "FarmHelperHypixel",
+  "key.farmhelperhypixel.toggle": "Включить/выключить режим фарма",
+  "key.farmhelperhypixel.home": "Отправить /home в режиме фарма",
+  "message.farmhelperhypixel.enabled": "FarmHelperHypixel: режим фарма включён",
+  "message.farmhelperhypixel.disabled": "FarmHelperHypixel: настройки восстановлены",
+  "message.farmhelperhypixel.attack_on": "FarmHelperHypixel: поломка включена",
+  "message.farmhelperhypixel.attack_off": "FarmHelperHypixel: поломка выключена"
+}
