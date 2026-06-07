@@ -4,7 +4,7 @@ FarmHelperHypixel is a client-side Fabric mod for Minecraft 1.21.11 that helps s
 
 Author: MeXaNoBoP
 
-[Download on Modrinth](https://modrinth.com/mod/farmhelperhypixel)
+[Download on Modrinth](https://modrinth.com/mod/farmhelperhypixel) | [Discord](https://discord.gg/vpZnt78Yfy)
 
 ## Languages
 
@@ -58,7 +58,7 @@ FarmHelperHypixel — клиентский Fabric мод для Minecraft 1.21.1
 
 Автор: MeXaNoBoP
 
-[Скачать на Modrinth](https://modrinth.com/mod/farmhelperhypixel)
+[Скачать на Modrinth](https://modrinth.com/mod/farmhelperhypixel) | [Discord](https://discord.gg/vpZnt78Yfy)
 
 ## Языки
 
