@@ -43,6 +43,22 @@
   "farmhelperhypixel.empty.binds": "No binds yet.",
   "farmhelperhypixel.empty.inversions": "No inversions yet.",
 
+  "farmhelperhypixel.section.crops": "Crops",
+  "farmhelperhypixel.desc.crops": "Tracks how many of each crop you've broken and how long you've been farming each one. Timers start on the first break and are saved across sessions.",
+
+  "farmhelperhypixel.crop.wheat": "Wheat",
+  "farmhelperhypixel.crop.carrot": "Carrot",
+  "farmhelperhypixel.crop.potato": "Potato",
+  "farmhelperhypixel.crop.nether_wart": "Nether Wart",
+  "farmhelperhypixel.crop.sugar_cane": "Sugar Cane",
+  "farmhelperhypixel.crop.cocoa": "Cocoa",
+  "farmhelperhypixel.crop.cactus": "Cactus",
+  "farmhelperhypixel.crop.melon": "Melon",
+  "farmhelperhypixel.crop.pumpkin": "Pumpkin",
+  "farmhelperhypixel.crop.cornflower": "Cornflower",
+
+  "farmhelperhypixel.crops.resetall": "Reset All",
+
   "farmhelperhypixel.hud.toggle": "HUD overlay",
   "farmhelperhypixel.hud.drag_hint": "Drag the HUD to reposition it",
   "farmhelperhypixel.hud.status.on": "Farm Mode: ON",

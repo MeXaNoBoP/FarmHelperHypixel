@@ -43,6 +43,22 @@
   "farmhelperhypixel.empty.binds": "Привязок нет.",
   "farmhelperhypixel.empty.inversions": "Инверсий нет.",
 
+  "farmhelperhypixel.section.crops": "Культуры",
+  "farmhelperhypixel.desc.crops": "Считает, сколько каждой культуры вы сломали, и сколько времени прошло с первой ломки. Таймер запускается при первой ломке и сохраняется между сессиями.",
+
+  "farmhelperhypixel.crop.wheat": "Пшеница",
+  "farmhelperhypixel.crop.carrot": "Морковь",
+  "farmhelperhypixel.crop.potato": "Картошка",
+  "farmhelperhypixel.crop.nether_wart": "Нарост",
+  "farmhelperhypixel.crop.sugar_cane": "Тростник",
+  "farmhelperhypixel.crop.cocoa": "Какао",
+  "farmhelperhypixel.crop.cactus": "Кактус",
+  "farmhelperhypixel.crop.melon": "Арбуз",
+  "farmhelperhypixel.crop.pumpkin": "Тыква",
+  "farmhelperhypixel.crop.cornflower": "Василёк",
+
+  "farmhelperhypixel.crops.resetall": "Сбросить всё",
+
   "farmhelperhypixel.hud.toggle": "HUD-оверлей",
   "farmhelperhypixel.hud.drag_hint": "Перетащите HUD чтобы переместить",
   "farmhelperhypixel.hud.status.on": "Фарм: ВКЛЮЧЁН",

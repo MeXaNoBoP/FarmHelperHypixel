@@ -7,6 +7,8 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.client.sound.PositionedSoundInstance;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
@@ -42,18 +44,34 @@ public class FarmHelperScreen extends Screen {
     private static final int T_GREEN = 0xFF5BE38B;
     private static final int T_RED   = 0xFFE35B5B;
 
-    // ── Section keys (4 sections) ─────────────────────────────────────────────
+    // ── Section keys (5 sections) ─────────────────────────────────────────────
     private static final String[] SEC_KEYS = {
         "farmhelperhypixel.section.controls",
         "farmhelperhypixel.section.commands",
         "farmhelperhypixel.section.inversion",
-        "farmhelperhypixel.section.farmmode"
+        "farmhelperhypixel.section.farmmode",
+        "farmhelperhypixel.section.crops"
     };
     private static final String[] DESC_KEYS = {
         "farmhelperhypixel.desc.controls",
         "farmhelperhypixel.desc.commands",
         "farmhelperhypixel.desc.inversion",
-        "farmhelperhypixel.desc.farmmode"
+        "farmhelperhypixel.desc.farmmode",
+        "farmhelperhypixel.desc.crops"
+    };
+
+    // ── Crop icons ────────────────────────────────────────────────────────────
+    private static final ItemStack[] CROP_ICONS = {
+        new ItemStack(Items.WHEAT),
+        new ItemStack(Items.CARROT),
+        new ItemStack(Items.POTATO),
+        new ItemStack(Items.NETHER_WART),
+        new ItemStack(Items.SUGAR_CANE),
+        new ItemStack(Items.COCOA_BEANS),
+        new ItemStack(Items.CACTUS),
+        new ItemStack(Items.MELON),
+        new ItemStack(Items.PUMPKIN),
+        new ItemStack(Items.CORNFLOWER),
     };
 
     // ── Persistent state ──────────────────────────────────────────────────────
@@ -128,6 +146,7 @@ public class FarmHelperScreen extends Screen {
             case 1 -> buildBindBtns(rpx, cy, rpw);
             case 2 -> buildInversionBtns(rpx, cy, rpw);
             case 3 -> buildFarmModeBtns(rpx, cy, rpw);
+            case 4 -> buildCropsBtns(rpx, cy, rpw);
         }
 
         if (section > 0)
@@ -278,6 +297,20 @@ public class FarmHelperScreen extends Screen {
         }
     }
 
+    private void buildCropsBtns(int rpx, int cy, int rpw) {
+        // Reset All button at bottom of crop list
+        btn(rpx + rpw / 2 - 52, cy + 138, 104, 16,
+                t("farmhelperhypixel.crops.resetall"), C_ITEM, T_RED, false, () -> {
+                    for (String key : FarmHelperConfig.CROP_KEYS) {
+                        FarmHelperConfig.CropStats s = config.cropStats.get(key);
+                        if (s != null) { s.startTime = 0; s.count = 0; }
+                    }
+                    config.save();
+                    sound(SoundEvents.ENTITY_GENERIC_EXTINGUISH_FIRE, 0.8f);
+                    clearAndInit();
+                });
+    }
+
     private void btn(int rx, int ry, int w, int h, String label, int bg, int fg, boolean ab, Runnable action) {
         btns.add(new Btn(rx, ry, w, h, label, bg, fg, ab, action));
     }
@@ -329,6 +362,7 @@ public class FarmHelperScreen extends Screen {
             case 1 -> renderBindsLabels(ctx, rpx, cy, rpw);
             case 2 -> renderInversionLabels(ctx, rpx, cy, rpw);
             case 3 -> renderFarmModeLabels(ctx, rpx, cy, rpw);
+            case 4 -> renderCropsLabels(ctx, rpx, cy, rpw);
         }
         renderFooter(ctx, wx, wy, mx, my);
 
@@ -455,6 +489,59 @@ public class FarmHelperScreen extends Screen {
         if (!config.commandBinds.isEmpty())
             ctx.drawText(textRenderer, config.commandBinds.size() + " " + t("farmhelperhypixel.status.commandbinds"),
                     rpx + 14, sy + 2, T_DIM, false);
+    }
+
+    private void renderCropsLabels(DrawContext ctx, int rpx, int cy, int rpw) {
+        String[] names = {
+            t("farmhelperhypixel.crop.wheat"),   t("farmhelperhypixel.crop.carrot"),
+            t("farmhelperhypixel.crop.potato"),  t("farmhelperhypixel.crop.nether_wart"),
+            t("farmhelperhypixel.crop.sugar_cane"),
+            t("farmhelperhypixel.crop.cocoa"),   t("farmhelperhypixel.crop.cactus"),
+            t("farmhelperhypixel.crop.melon"),   t("farmhelperhypixel.crop.pumpkin"),
+            t("farmhelperhypixel.crop.cornflower"),
+        };
+
+        int colW   = (rpw - 10) / 2;   // ~158px per column
+        int col0x  = rpx + 4;
+        int col1x  = rpx + 4 + colW + 2;
+        int rowH   = 24;
+        int startY = cy + 10;
+
+        for (int i = 0; i < 10; i++) {
+            int col  = i < 5 ? 0 : 1;
+            int row  = i < 5 ? i : i - 5;
+            int cx   = col == 0 ? col0x : col1x;
+            int ry   = startY + row * rowH;
+
+            ctx.fill(cx, ry, cx + colW, ry + 20, C_ITEM);
+            border(ctx, cx, ry, colW, 20, C_BORDER);
+
+            ctx.drawItem(CROP_ICONS[i], cx + 2, ry + 2);
+
+            // Crop name (truncate if too wide)
+            ctx.drawText(textRenderer, names[i], cx + 20, ry + 3, T_MAIN, false);
+
+            FarmHelperConfig.CropStats stats = config.cropStats.get(FarmHelperConfig.CROP_KEYS[i]);
+            if (stats == null || stats.startTime == 0) {
+                ctx.drawText(textRenderer, "--:--:--", cx + 20, ry + 12, T_DIM, false);
+            } else {
+                String time  = formatCropTime(System.currentTimeMillis() - stats.startTime);
+                String count = "×" + stats.count;
+                ctx.drawText(textRenderer, time,  cx + 20, ry + 12, T_GREY, false);
+                ctx.drawText(textRenderer, count,
+                        cx + colW - 3 - textRenderer.getWidth(count), ry + 12, T_GREEN, false);
+            }
+        }
+
+        // Vertical separator between columns
+        ctx.fill(col1x - 2, cy + 8, col1x - 1, cy + 138, C_SEP);
+    }
+
+    private static String formatCropTime(long ms) {
+        if (ms < 0) ms = 0;
+        long secs = ms / 1000;
+        long h = secs / 3600, m = (secs % 3600) / 60, s = secs % 60;
+        return String.format("%02d:%02d:%02d", h, m, s);
     }
 
     private void renderFooter(DrawContext ctx, int wx, int wy, int mx, int my) {

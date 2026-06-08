@@ -7,7 +7,9 @@ import org.lwjgl.glfw.GLFW;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class FarmHelperConfig {
     private static final Path CONFIG_FILE = FabricLoader.getInstance()
@@ -51,6 +53,18 @@ public class FarmHelperConfig {
         }
     }
 
+    public static final String[] CROP_KEYS = {
+        "wheat", "carrot", "potato", "nether_wart", "sugar_cane",
+        "cocoa", "cactus", "melon", "pumpkin", "cornflower"
+    };
+
+    public static class CropStats {
+        public long startTime = 0; // epoch ms of first break, 0 = never
+        public int  count     = 0;
+    }
+
+    public Map<String, CropStats> cropStats = new LinkedHashMap<>();
+
     public static FarmHelperConfig load() {
         File file = CONFIG_FILE.toFile();
         if (!file.exists()) {
@@ -64,6 +78,8 @@ public class FarmHelperConfig {
             if (cfg == null) cfg = new FarmHelperConfig();
             if (cfg.commandBinds   == null) cfg.commandBinds   = new ArrayList<>();
             if (cfg.inversionBinds == null) cfg.inversionBinds = new ArrayList<>();
+            if (cfg.cropStats      == null) cfg.cropStats      = new LinkedHashMap<>();
+            for (String key : CROP_KEYS) cfg.cropStats.putIfAbsent(key, new CropStats());
             return cfg;
         } catch (Exception e) {
             return new FarmHelperConfig();

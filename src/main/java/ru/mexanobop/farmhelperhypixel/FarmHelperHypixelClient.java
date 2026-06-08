@@ -4,10 +4,14 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashMap;
@@ -32,6 +36,10 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
     private static final Map<Integer, Boolean> invPrev1 = new HashMap<>();
     private static final Map<Integer, Boolean> invPrev2 = new HashMap<>();
 
+    // Crop tracking — crosshair-based, works on multiplayer
+    private static BlockPos trackedCropPos   = null;
+    private static Block    trackedCropBlock = null;
+
     @Override
     public void onInitializeClient() {
         config = FarmHelperConfig.load();
@@ -54,6 +62,8 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
                 client.setScreen(new FarmHelperScreen(config));
             }
         }
+
+        tickCropTracking(client);
 
         if (client.player == null) {
             if (settingsApplied) removeBinds(client);
@@ -197,6 +207,55 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
         invState.clear();
         invPrev1.clear();
         invPrev2.clear();
+    }
+
+    private static void tickCropTracking(MinecraftClient client) {
+        if (client.world == null || client.player == null) {
+            trackedCropPos = null; trackedCropBlock = null;
+            return;
+        }
+        BlockPos crossPos = null;
+        if (client.crosshairTarget instanceof BlockHitResult bhr) crossPos = bhr.getBlockPos();
+
+        if (trackedCropPos != null) {
+            Block current = client.world.getBlockState(trackedCropPos).getBlock();
+            if (current != trackedCropBlock) {
+                if (current == Blocks.AIR || !isCrop(current)) recordCropBreak(trackedCropBlock);
+                trackedCropPos = null; trackedCropBlock = null;
+            } else if (!trackedCropPos.equals(crossPos)) {
+                trackedCropPos = null; trackedCropBlock = null;
+            }
+        }
+        if (crossPos != null && trackedCropPos == null) {
+            Block b = client.world.getBlockState(crossPos).getBlock();
+            if (isCrop(b)) { trackedCropPos = crossPos; trackedCropBlock = b; }
+        }
+    }
+
+    private static boolean isCrop(Block b) {
+        return b == Blocks.WHEAT || b == Blocks.CARROTS || b == Blocks.POTATOES
+            || b == Blocks.NETHER_WART || b == Blocks.SUGAR_CANE || b == Blocks.COCOA
+            || b == Blocks.CACTUS || b == Blocks.MELON || b == Blocks.PUMPKIN
+            || b == Blocks.CORNFLOWER;
+    }
+
+    private static void recordCropBreak(Block block) {
+        String key = null;
+        if      (block == Blocks.WHEAT)       key = "wheat";
+        else if (block == Blocks.CARROTS)     key = "carrot";
+        else if (block == Blocks.POTATOES)    key = "potato";
+        else if (block == Blocks.NETHER_WART) key = "nether_wart";
+        else if (block == Blocks.SUGAR_CANE)  key = "sugar_cane";
+        else if (block == Blocks.COCOA)       key = "cocoa";
+        else if (block == Blocks.CACTUS)      key = "cactus";
+        else if (block == Blocks.MELON)       key = "melon";
+        else if (block == Blocks.PUMPKIN)     key = "pumpkin";
+        else if (block == Blocks.CORNFLOWER)  key = "cornflower";
+        if (key == null) return;
+        FarmHelperConfig.CropStats stats = config.cropStats.computeIfAbsent(key, k -> new FarmHelperConfig.CropStats());
+        if (stats.startTime == 0) stats.startTime = System.currentTimeMillis();
+        stats.count++;
+        config.save();
     }
 
     private static void sendCommand(MinecraftClient client, String command) {
