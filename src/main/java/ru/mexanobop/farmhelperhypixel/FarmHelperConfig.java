@@ -22,7 +22,8 @@ public class FarmHelperConfig {
     public boolean autoAttack = false;
     public boolean reduceSensitivity = true;
     public boolean farmModeEnabled = false;
-    public List<CommandBind> commandBinds = new ArrayList<>();
+    public List<CommandBind>   commandBinds   = new ArrayList<>();
+    public List<InversionBind> inversionBinds = new ArrayList<>();
 
     public static class CommandBind {
         public int key;
@@ -33,6 +34,18 @@ public class FarmHelperConfig {
         public CommandBind(int key, String command) {
             this.key = key;
             this.command = command;
+        }
+    }
+
+    public static class InversionBind {
+        public int key1;
+        public int key2;
+
+        public InversionBind() {}
+
+        public InversionBind(int key1, int key2) {
+            this.key1 = key1;
+            this.key2 = key2;
         }
     }
 
@@ -47,7 +60,8 @@ public class FarmHelperConfig {
         try (Reader r = new FileReader(file)) {
             FarmHelperConfig cfg = GSON.fromJson(r, FarmHelperConfig.class);
             if (cfg == null) cfg = new FarmHelperConfig();
-            if (cfg.commandBinds == null) cfg.commandBinds = new ArrayList<>();
+            if (cfg.commandBinds   == null) cfg.commandBinds   = new ArrayList<>();
+            if (cfg.inversionBinds == null) cfg.inversionBinds = new ArrayList<>();
             return cfg;
         } catch (Exception e) {
             return new FarmHelperConfig();

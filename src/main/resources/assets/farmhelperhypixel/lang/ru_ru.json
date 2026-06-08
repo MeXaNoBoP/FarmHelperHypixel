@@ -1,4 +1,46 @@
 {
   "key.category.farmhelperhypixel.main": "FarmHelperHypixel",
-  "key.farmhelperhypixel.open_menu": "Открыть меню FarmHelper"
+  "key.farmhelperhypixel.open_menu": "Открыть меню FarmHelper",
+
+  "farmhelperhypixel.screen.title": "FarmHelperHypixel",
+
+  "farmhelperhypixel.section.controls": "Управление",
+  "farmhelperhypixel.section.commands": "Команды",
+  "farmhelperhypixel.section.inversion": "Инверсия",
+  "farmhelperhypixel.section.farmmode": "Режим фарма",
+
+  "farmhelperhypixel.desc.controls": "Перепривяжите клавиши, активные в режиме фарма. Движение и атака будут переназначены на ваши кнопки.",
+  "farmhelperhypixel.desc.commands": "Добавьте привязки клавиш к командам. В режиме фарма нажатие клавиши автоматически отправляет команду на сервер.",
+  "farmhelperhypixel.desc.inversion": "Настройте пары переключения. Нажмите клавишу один раз чтобы зажать её, снова — отпустить. Нажатие парной клавиши переключает на неё.",
+  "farmhelperhypixel.desc.farmmode": "Включите или выключите режим фарма. При активном режиме применяются все привязки и настройки. Нажмите F8 в любой момент для открытия меню.",
+
+  "farmhelperhypixel.key.forward": "Вперёд",
+  "farmhelperhypixel.key.back": "Назад",
+  "farmhelperhypixel.key.left": "Влево",
+  "farmhelperhypixel.key.right": "Вправо",
+  "farmhelperhypixel.key.attack": "Атака",
+  "farmhelperhypixel.key.autoattack": "Автоатака:",
+  "farmhelperhypixel.key.lowsens": "Низкая чувств.:",
+
+  "farmhelperhypixel.btn.back": "← Назад",
+  "farmhelperhypixel.btn.next": "Далее →",
+  "farmhelperhypixel.btn.done": "Готово ✓",
+  "farmhelperhypixel.btn.on": "ВКЛ",
+  "farmhelperhypixel.btn.off": "ВЫКЛ",
+  "farmhelperhypixel.btn.presskey": "Нажмите клавишу…",
+  "farmhelperhypixel.btn.addbind": "+ Добавить",
+  "farmhelperhypixel.btn.addinversion": "+ Инверсия",
+  "farmhelperhypixel.btn.setkey1": "[ Клавиша 1 ]",
+  "farmhelperhypixel.btn.setkey2": "[ Клавиша 2 ]",
+
+  "farmhelperhypixel.status.active": "✓ Режим фарма активен",
+  "farmhelperhypixel.status.off": "○ Режим фарма выкл.",
+  "farmhelperhypixel.status.bindings": "Активные привязки",
+  "farmhelperhypixel.status.commandbinds": "привязок команд",
+
+  "farmhelperhypixel.farmmode.on": "✓   Режим фарма ВКЛЮЧЁН",
+  "farmhelperhypixel.farmmode.off": "✗   Режим фарма ВЫКЛЮЧЕН",
+
+  "farmhelperhypixel.empty.binds": "Привязок нет.",
+  "farmhelperhypixel.empty.inversions": "Инверсий нет."
 }

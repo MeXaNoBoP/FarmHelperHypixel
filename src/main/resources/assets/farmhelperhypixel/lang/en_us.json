@@ -1,4 +1,46 @@
 {
   "key.category.farmhelperhypixel.main": "FarmHelperHypixel",
-  "key.farmhelperhypixel.open_menu": "Open FarmHelper menu"
+  "key.farmhelperhypixel.open_menu": "Open FarmHelper menu",
+
+  "farmhelperhypixel.screen.title": "FarmHelperHypixel",
+
+  "farmhelperhypixel.section.controls": "Controls",
+  "farmhelperhypixel.section.commands": "Commands",
+  "farmhelperhypixel.section.inversion": "Inversion",
+  "farmhelperhypixel.section.farmmode": "Farm Mode",
+
+  "farmhelperhypixel.desc.controls": "Rebind the keys used when farm mode is active. Movement and attack keys will be remapped to your chosen bindings.",
+  "farmhelperhypixel.desc.commands": "Add key-to-command bindings. While farm mode is on, pressing the bound key sends the command to the server automatically.",
+  "farmhelperhypixel.desc.inversion": "Configure toggle pairs. Press a key once to start holding it, again to release. Pressing the paired key switches to it instead.",
+  "farmhelperhypixel.desc.farmmode": "Enable or disable farm mode. When active, all your key bindings and settings are applied. Press F8 at any time to open this menu.",
+
+  "farmhelperhypixel.key.forward": "Forward",
+  "farmhelperhypixel.key.back": "Back",
+  "farmhelperhypixel.key.left": "Left",
+  "farmhelperhypixel.key.right": "Right",
+  "farmhelperhypixel.key.attack": "Attack",
+  "farmhelperhypixel.key.autoattack": "Auto-attack:",
+  "farmhelperhypixel.key.lowsens": "Low sensitivity:",
+
+  "farmhelperhypixel.btn.back": "← Back",
+  "farmhelperhypixel.btn.next": "Next →",
+  "farmhelperhypixel.btn.done": "Done ✓",
+  "farmhelperhypixel.btn.on": "ON",
+  "farmhelperhypixel.btn.off": "OFF",
+  "farmhelperhypixel.btn.presskey": "Press a key…",
+  "farmhelperhypixel.btn.addbind": "+ Add Bind",
+  "farmhelperhypixel.btn.addinversion": "+ Add Inversion",
+  "farmhelperhypixel.btn.setkey1": "[ Key 1 ]",
+  "farmhelperhypixel.btn.setkey2": "[ Key 2 ]",
+
+  "farmhelperhypixel.status.active": "✓ Farm Mode active",
+  "farmhelperhypixel.status.off": "○ Farm Mode off",
+  "farmhelperhypixel.status.bindings": "Active bindings",
+  "farmhelperhypixel.status.commandbinds": "command bind(s)",
+
+  "farmhelperhypixel.farmmode.on": "✓   Farm Mode is ON",
+  "farmhelperhypixel.farmmode.off": "✗   Farm Mode is OFF",
+
+  "farmhelperhypixel.empty.binds": "No binds yet.",
+  "farmhelperhypixel.empty.inversions": "No inversions yet."
 }

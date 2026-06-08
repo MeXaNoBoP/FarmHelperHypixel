@@ -5,6 +5,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.resource.language.I18n;
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
@@ -17,10 +18,10 @@ public class FarmHelperScreen extends Screen {
 
     // ── Layout ────────────────────────────────────────────────────────────────
     private static final int WIN_W  = 504;
-    private static final int WIN_H  = 324;
-    private static final int TOP_H  = 40;   // header with progress dots
-    private static final int BOT_H  = 32;   // bottom navigation bar
-    private static final int LEFT_W = 176;  // description panel width
+    private static final int WIN_H  = 332;
+    private static final int TOP_H  = 44;
+    private static final int BOT_H  = 32;
+    private static final int LEFT_W = 176;
 
     // ── Colors ────────────────────────────────────────────────────────────────
     private static final int C_BG       = 0xFF0C0C0C;
@@ -29,47 +30,69 @@ public class FarmHelperScreen extends Screen {
     private static final int C_BORDER   = 0xFF232323;
     private static final int C_ITEM     = 0xFF161616;
     private static final int C_ACTIVE   = 0xFF0C3526;
-    private static final int C_ACTIVE_B = 0xFF1D6247; // active border
+    private static final int C_ACTIVE_B = 0xFF1D6247;
     private static final int C_BTN      = 0xFF181818;
     private static final int C_HEADER   = 0xFF080808;
 
     // ── Text ──────────────────────────────────────────────────────────────────
-    private static final int T_WHITE  = 0xFFFFFFFF;
-    private static final int T_MAIN   = 0xFFE8E8E8;
-    private static final int T_GREY   = 0xFF999999;
-    private static final int T_DIM    = 0xFF555555;
-    private static final int T_GREEN  = 0xFF5BE38B;
-    private static final int T_RED    = 0xFFE35B5B;
+    private static final int T_WHITE = 0xFFFFFFFF;
+    private static final int T_MAIN  = 0xFFE8E8E8;
+    private static final int T_GREY  = 0xFF999999;
+    private static final int T_DIM   = 0xFF555555;
+    private static final int T_GREEN = 0xFF5BE38B;
+    private static final int T_RED   = 0xFFE35B5B;
 
-    // ── Sections ──────────────────────────────────────────────────────────────
-    private static final String[] SEC_NAMES = {"Controls", "Commands", "Farm Mode"};
-    private static final String[] SEC_DESC  = {
-        "Rebind the keys that are active when farm mode is enabled. Movement and attack keys will be remapped to your chosen bindings.",
-        "Add key-to-command bindings. While farm mode is on, pressing the bound key will send the command to the server automatically.",
-        "Toggle farm mode on or off. When active, all your key bindings and settings are applied. Press F8 at any time to open this menu."
+    // ── Section keys (4 sections) ─────────────────────────────────────────────
+    private static final String[] SEC_KEYS = {
+        "farmhelperhypixel.section.controls",
+        "farmhelperhypixel.section.commands",
+        "farmhelperhypixel.section.inversion",
+        "farmhelperhypixel.section.farmmode"
+    };
+    private static final String[] DESC_KEYS = {
+        "farmhelperhypixel.desc.controls",
+        "farmhelperhypixel.desc.commands",
+        "farmhelperhypixel.desc.inversion",
+        "farmhelperhypixel.desc.farmmode"
     };
 
-    // ── State ─────────────────────────────────────────────────────────────────
+    // ── Persistent state ──────────────────────────────────────────────────────
+    private static int lastSection = 0;
+
+    // ── Per-open state ────────────────────────────────────────────────────────
     private final FarmHelperConfig config;
-    private int     section             = 0;
+    private int     section             = lastSection;
+    private int     windowX             = -1;
+    private int     windowY             = -1;
+    private boolean dragging            = false;
+    private int     dragOffX, dragOffY;
+    private long    openTime            = 0;
+
+    // Controls
     private String  capturingFor        = null;
+
+    // Commands
     private boolean addingBind          = false;
     private boolean capturingNewBindKey = false;
     private int     newBindKey          = 0;
     private String  pendingCmd          = "";
     private TextFieldWidget cmdField    = null;
-    private long    openTime            = 0;
 
-    private record Btn(int x, int y, int w, int h, String label, int bg, int fg, boolean activeBorder, Runnable action) {}
+    // Inversion
+    private boolean addingInversion     = false;
+    private boolean capturingInvKey1    = false;
+    private boolean capturingInvKey2    = false;
+    private int     newInvKey1          = 0;
+    private int     newInvKey2          = 0;
+
+    // Buttons store RELATIVE positions (relative to window top-left)
+    private record Btn(int rx, int ry, int w, int h, String label, int bg, int fg, boolean ab, Runnable action) {}
     private final List<Btn> btns = new ArrayList<>();
 
     public FarmHelperScreen(FarmHelperConfig config) {
         super(Text.literal("FarmHelperHypixel"));
         this.config = config;
     }
-
-    private int wx() { return (width  - WIN_W) / 2; }
-    private int wy() { return (height - WIN_H) / 2; }
 
     // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +102,10 @@ public class FarmHelperScreen extends Screen {
             openTime = System.currentTimeMillis();
             client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.BLOCK_NOTE_BLOCK_PLING, 1.6f));
         }
+        if (windowX < 0) {
+            windowX = (width  - WIN_W) / 2;
+            windowY = (height - WIN_H) / 2;
+        }
         clearChildren();
         btns.clear();
         cmdField = null;
@@ -86,90 +113,87 @@ public class FarmHelperScreen extends Screen {
     }
 
     private void buildButtons() {
-        int wx = wx(), wy = wy();
-        int rx  = wx + LEFT_W + 1;
-        int rw  = WIN_W - LEFT_W - 2;
-        int cy  = wy + TOP_H;
-        int by  = wy + WIN_H - BOT_H;
+        // All coordinates are RELATIVE to window (0,0)
+        int rpx = LEFT_W + 1;
+        int rpw = WIN_W - LEFT_W - 2;
+        int cy  = TOP_H;
+        int by  = WIN_H - BOT_H;
 
-        // Right panel buttons per section
         switch (section) {
-            case 0 -> buildControlBtns(rx, cy, rw);
-            case 1 -> buildBindBtns(wx, rx, cy, rw);
-            case 2 -> buildStatusBtns(rx, cy, rw);
+            case 0 -> buildControlBtns(rpx, cy, rpw);
+            case 1 -> buildBindBtns(rpx, cy, rpw);
+            case 2 -> buildInversionBtns(rpx, cy, rpw);
+            case 3 -> buildFarmModeBtns(rpx, cy, rpw);
         }
 
-        // Back
         if (section > 0)
-            btn(wx + 10, by + 8, 62, 16, "← Back", C_BTN, T_GREY, false, this::goBack);
+            btn(10, by + 8, 62, 16, t("farmhelperhypixel.btn.back"), C_BTN, T_GREY, false, this::goBack);
 
-        // Next / Done
-        boolean last = section == SEC_NAMES.length - 1;
-        btn(wx + WIN_W - 84, by + 8, 74, 16,
-                last ? "Done  ✓" : "Next  →",
+        boolean last = section == SEC_KEYS.length - 1;
+        btn(WIN_W - 84, by + 8, 74, 16,
+                last ? t("farmhelperhypixel.btn.done") : t("farmhelperhypixel.btn.next"),
                 last ? C_ACTIVE : C_BTN,
                 last ? T_GREEN : T_MAIN,
                 last, this::goNext);
     }
 
-    private void buildControlBtns(int rx, int cy, int rw) {
-        String[] labels  = {"Forward", "Back", "Left", "Right", "Attack"};
-        int[]    keys    = {config.forwardKey, config.backKey, config.leftKey, config.rightKey, config.attackKey};
+    private void buildControlBtns(int rpx, int cy, int rpw) {
         String[] actions = {"forward", "back", "left", "right", "attack"};
-
-        for (int i = 0; i < labels.length; i++) {
+        for (int i = 0; i < actions.length; i++) {
             final String act = actions[i];
             boolean cap = act.equals(capturingFor);
-            String lbl = cap ? "Press a key…" : keyName(keys[i]);
-            btn(rx + rw - 102, cy + 12 + i * 26, 96, 16,
+            int[] keys = {config.forwardKey, config.backKey, config.leftKey, config.rightKey, config.attackKey};
+            String lbl = cap ? t("farmhelperhypixel.btn.presskey") : keyName(keys[i]);
+            btn(rpx + rpw - 102, cy + 12 + i * 26, 96, 16,
                     lbl, cap ? C_ACTIVE : C_ITEM, cap ? T_GREEN : T_MAIN, cap,
                     () -> { capturingFor = act; sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f); clearAndInit(); });
         }
 
-        int ty = cy + 12 + labels.length * 26 + 10;
+        int ty = cy + 12 + 5 * 26 + 10;
         boolean aa = config.autoAttack;
-        btn(rx + rw - 56, ty, 50, 14, aa ? "ON" : "OFF",
+        btn(rpx + rpw - 56, ty, 50, 14, aa ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off"),
                 aa ? C_ACTIVE : C_ITEM, aa ? T_GREEN : T_RED, aa,
                 () -> { config.autoAttack = !config.autoAttack; config.save();
                         sound(config.autoAttack ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
                               config.autoAttack ? 1.6f : 0.8f); clearAndInit(); });
 
         boolean rs = config.reduceSensitivity;
-        btn(rx + rw - 56, ty + 22, 50, 14, rs ? "ON" : "OFF",
+        btn(rpx + rpw - 56, ty + 22, 50, 14, rs ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off"),
                 rs ? C_ACTIVE : C_ITEM, rs ? T_GREEN : T_RED, rs,
                 () -> { config.reduceSensitivity = !config.reduceSensitivity; config.save();
                         sound(config.reduceSensitivity ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
                               config.reduceSensitivity ? 1.6f : 0.8f); clearAndInit(); });
     }
 
-    private void buildBindBtns(int wx, int rx, int cy, int rw) {
+    private void buildBindBtns(int rpx, int cy, int rpw) {
         List<FarmHelperConfig.CommandBind> binds = config.commandBinds;
         for (int i = 0; i < binds.size(); i++) {
             final int idx = i;
-            btn(rx + rw - 24, cy + 12 + i * 26, 18, 16, "✕", C_ITEM, T_RED, false,
+            btn(rpx + rpw - 24, cy + 12 + i * 26, 18, 16, "✕", C_ITEM, T_RED, false,
                 () -> { config.commandBinds.remove(idx); config.save();
                         sound(SoundEvents.BLOCK_LEVER_CLICK, 0.7f); clearAndInit(); });
         }
-
         int ay = cy + 12 + binds.size() * 26 + 8;
-
         if (addingBind) {
             boolean capK = capturingNewBindKey;
-            String kl = capK ? "Press a key…" : (newBindKey == 0 ? "[ Set key ]" : keyName(newBindKey));
-            btn(rx + 6, ay, 96, 16, kl,
+            String kl = capK ? t("farmhelperhypixel.btn.presskey")
+                             : (newBindKey == 0 ? t("farmhelperhypixel.btn.setkey1") : keyName(newBindKey));
+            btn(rpx + 6, ay, 96, 16, kl,
                     (capK || newBindKey != 0) ? C_ACTIVE : C_ITEM,
                     (capK || newBindKey != 0) ? T_GREEN : T_GREY,
                     newBindKey != 0 && !capK,
                     () -> { capturingNewBindKey = true; sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f); clearAndInit(); });
 
-            cmdField = new TextFieldWidget(textRenderer, rx + 110, ay, rw - 142, 16, Text.empty());
+            int fieldX = windowX + rpx + 110;
+            int fieldY = windowY + ay;
+            cmdField = new TextFieldWidget(textRenderer, fieldX, fieldY, rpw - 142, 16, Text.empty());
             cmdField.setPlaceholder(Text.literal("/command…"));
             cmdField.setText(pendingCmd);
             cmdField.setChangedListener(t -> pendingCmd = t);
             addDrawableChild(cmdField);
             if (newBindKey != 0) setFocused(cmdField);
 
-            btn(rx + rw - 24, ay, 18, 16, "✓", C_ACTIVE, T_GREEN, true, () -> {
+            btn(rpx + rpw - 24, ay, 18, 16, "✓", C_ACTIVE, T_GREEN, true, () -> {
                 String cmd = pendingCmd.replaceFirst("^/", "").trim();
                 if (newBindKey != 0 && !cmd.isEmpty()) {
                     config.commandBinds.add(new FarmHelperConfig.CommandBind(newBindKey, cmd));
@@ -181,35 +205,77 @@ public class FarmHelperScreen extends Screen {
                 }
             });
         } else {
-            btn(rx + 6, ay, 96, 16, "+ Add Bind", C_ITEM, T_GREY, false,
+            btn(rpx + 6, ay, 96, 16, t("farmhelperhypixel.btn.addbind"), C_ITEM, T_GREY, false,
                 () -> { addingBind = true; sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.2f); clearAndInit(); });
         }
     }
 
-    private void buildStatusBtns(int rx, int cy, int rw) {
+    private void buildInversionBtns(int rpx, int cy, int rpw) {
+        List<FarmHelperConfig.InversionBind> invs = config.inversionBinds;
+        for (int i = 0; i < invs.size(); i++) {
+            final int idx = i;
+            btn(rpx + rpw - 24, cy + 12 + i * 26, 18, 16, "✕", C_ITEM, T_RED, false,
+                () -> { config.inversionBinds.remove(idx); config.save();
+                        FarmHelperHypixelClient.releaseInversions();
+                        sound(SoundEvents.BLOCK_LEVER_CLICK, 0.7f); clearAndInit(); });
+        }
+        int ay = cy + 12 + invs.size() * 26 + 8;
+        if (addingInversion) {
+            boolean capK1 = capturingInvKey1, capK2 = capturingInvKey2;
+            String l1 = capK1 ? t("farmhelperhypixel.btn.presskey")
+                              : (newInvKey1 == 0 ? t("farmhelperhypixel.btn.setkey1") : keyName(newInvKey1));
+            String l2 = capK2 ? t("farmhelperhypixel.btn.presskey")
+                              : (newInvKey2 == 0 ? t("farmhelperhypixel.btn.setkey2") : keyName(newInvKey2));
+
+            btn(rpx + 6, ay, 100, 16, l1,
+                    (capK1 || newInvKey1 != 0) ? C_ACTIVE : C_ITEM,
+                    (capK1 || newInvKey1 != 0) ? T_GREEN : T_GREY,
+                    newInvKey1 != 0 && !capK1,
+                    () -> { capturingInvKey1 = true; capturingInvKey2 = false;
+                            sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f); clearAndInit(); });
+
+            btn(rpx + 118, ay, 100, 16, l2,
+                    (capK2 || newInvKey2 != 0) ? C_ACTIVE : C_ITEM,
+                    (capK2 || newInvKey2 != 0) ? T_GREEN : T_GREY,
+                    newInvKey2 != 0 && !capK2,
+                    () -> { capturingInvKey2 = true; capturingInvKey1 = false;
+                            sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f); clearAndInit(); });
+
+            btn(rpx + rpw - 24, ay, 18, 16, "✓", C_ACTIVE, T_GREEN, true, () -> {
+                if (newInvKey1 != 0 && newInvKey2 != 0) {
+                    config.inversionBinds.add(new FarmHelperConfig.InversionBind(newInvKey1, newInvKey2));
+                    config.save();
+                    sound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f);
+                    addingInversion = capturingInvKey1 = capturingInvKey2 = false;
+                    newInvKey1 = newInvKey2 = 0;
+                    clearAndInit();
+                }
+            });
+        } else {
+            btn(rpx + 6, ay, 110, 16, t("farmhelperhypixel.btn.addinversion"), C_ITEM, T_GREY, false,
+                () -> { addingInversion = true; sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.2f); clearAndInit(); });
+        }
+    }
+
+    private void buildFarmModeBtns(int rpx, int cy, int rpw) {
         boolean fm = config.farmModeEnabled;
-        btn(rx + 10, cy + 18, rw - 20, 28,
-                fm ? "✓   Farm Mode is ON" : "✗   Farm Mode is OFF",
+        btn(rpx + 10, cy + 18, rpw - 20, 28,
+                fm ? t("farmhelperhypixel.farmmode.on") : t("farmhelperhypixel.farmmode.off"),
                 fm ? C_ACTIVE : C_ITEM, fm ? T_GREEN : T_RED, fm,
                 () -> { config.farmModeEnabled = !config.farmModeEnabled; config.save();
                         sound(config.farmModeEnabled ? SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
                               config.farmModeEnabled ? 1.6f : 0.8f); clearAndInit(); });
     }
 
-    private void btn(int x, int y, int w, int h, String label, int bg, int fg, boolean ab, Runnable action) {
-        btns.add(new Btn(x, y, w, h, label, bg, fg, ab, action));
+    private void btn(int rx, int ry, int w, int h, String label, int bg, int fg, boolean ab, Runnable action) {
+        btns.add(new Btn(rx, ry, w, h, label, bg, fg, ab, action));
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
 
     @Override
     public void render(DrawContext ctx, int mx, int my, float delta) {
-        long time = System.currentTimeMillis();
-        int wx = wx(), wy = wy();
-        float fade = Math.min(1.0f, (time - openTime) / 180f);
-
-        // Dim overlay
-        ctx.fill(0, 0, width, height, (int)(0xCC * fade) << 24);
+        int wx = windowX, wy = windowY;
 
         // Window panels
         ctx.fill(wx, wy, wx + WIN_W, wy + WIN_H, C_BG);
@@ -217,173 +283,166 @@ public class FarmHelperScreen extends Screen {
         ctx.fill(wx, wy, wx + WIN_W, wy + TOP_H, C_HEADER);
         ctx.fill(wx, wy + WIN_H - BOT_H, wx + WIN_W, wy + WIN_H, C_HEADER);
 
-        // Borders & separators
+        // Borders
         border(ctx, wx, wy, WIN_W, WIN_H, C_BORDER);
-        ctx.fill(wx + 1, wy + TOP_H,             wx + WIN_W - 1, wy + TOP_H + 1,         C_SEP);
-        ctx.fill(wx + 1, wy + WIN_H - BOT_H,     wx + WIN_W - 1, wy + WIN_H - BOT_H + 1, C_SEP);
+        ctx.fill(wx + 1, wy + TOP_H, wx + WIN_W - 1, wy + TOP_H + 1, C_SEP);
+        ctx.fill(wx + 1, wy + WIN_H - BOT_H, wx + WIN_W - 1, wy + WIN_H - BOT_H + 1, C_SEP);
         ctx.fill(wx + LEFT_W, wy + TOP_H + 1, wx + LEFT_W + 1, wy + WIN_H - BOT_H - 1, C_SEP);
 
-        // Header
+        // Sections
         renderHeader(ctx, wx, wy, mx, my);
-
-        // Left description panel
         renderLeft(ctx, wx, wy);
-
-        // Right content panel labels
-        int rx = wx + LEFT_W + 1, rw = WIN_W - LEFT_W - 2, cy = wy + TOP_H;
+        int rpx = wx + LEFT_W + 1, rpw = WIN_W - LEFT_W - 2, cy = wy + TOP_H;
         switch (section) {
-            case 0 -> renderControlsLabels(ctx, rx, cy, rw);
-            case 1 -> renderBindsLabels(ctx, rx, cy, rw);
-            case 2 -> renderStatusLabels(ctx, rx, cy, rw);
+            case 0 -> renderControlsLabels(ctx, rpx, cy, rpw);
+            case 1 -> renderBindsLabels(ctx, rpx, cy, rpw);
+            case 2 -> renderInversionLabels(ctx, rpx, cy, rpw);
+            case 3 -> renderFarmModeLabels(ctx, rpx, cy, rpw);
         }
-
-        // Footer
         renderFooter(ctx, wx, wy, mx, my);
 
         // Custom buttons
         for (Btn b : btns) renderBtn(ctx, b, mx, my);
 
-        // Real widgets
+        // Real widgets (TextFieldWidget etc.)
         super.render(ctx, mx, my, delta);
     }
 
     private void renderHeader(DrawContext ctx, int wx, int wy, int mx, int my) {
-        // Mod name (left)
-        ctx.drawText(textRenderer, "FarmHelperHypixel", wx + 10, wy + 6, T_DIM, false);
+        ctx.drawText(textRenderer, t("farmhelperhypixel.screen.title"), wx + 10, wy + 6, T_DIM, false);
 
-        // Progress dots centered
-        int n = SEC_NAMES.length;
-        int dotR = 4, gap = 38;
+        int n = SEC_KEYS.length, dotR = 4, gap = 28;
         int totalW = n * (dotR * 2) + (n - 1) * gap;
         int dx0 = wx + (WIN_W - totalW) / 2;
         int dotCY = wy + TOP_H / 2 - 2;
 
         for (int i = 0; i < n; i++) {
             int cx = dx0 + i * (dotR * 2 + gap) + dotR;
-
-            // Connecting line to next dot
             if (i < n - 1) {
-                int lx1 = cx + dotR + 2, lx2 = cx + dotR + gap - 1;
                 int lc = i < section ? C_ACTIVE_B : C_BORDER;
-                ctx.fill(lx1, dotCY - 1, lx2, dotCY + 2, lc);
+                ctx.fill(cx + dotR + 2, dotCY - 1, cx + dotR + gap - 1, dotCY + 2, lc);
             }
-
-            // Circle fill
             boolean active = i == section, done = i < section;
-            int cc = active ? T_GREEN : (done ? C_ACTIVE_B : C_BORDER);
-            circle(ctx, cx, dotCY, dotR, cc);
-
-            // Number inside
+            circle(ctx, cx, dotCY, dotR, active ? T_GREEN : (done ? C_ACTIVE_B : C_BORDER));
             String num = String.valueOf(i + 1);
-            int nc = active ? 0xFF003018 : (done ? 0xFF003018 : C_BG);
-            ctx.drawText(textRenderer, num,
-                    cx - textRenderer.getWidth(num) / 2,
-                    dotCY - 3, nc, false);
-
-            // Section name below dot
-            String sn = SEC_NAMES[i];
-            int snX = cx - textRenderer.getWidth(sn) / 2;
-            int snC = active ? T_GREEN : (done ? T_GREY : T_DIM);
-            ctx.drawText(textRenderer, sn, snX, dotCY + dotR + 4, snC, false);
+            ctx.drawText(textRenderer, num, cx - textRenderer.getWidth(num) / 2, dotCY - 3,
+                    active ? 0xFF002010 : (done ? 0xFF002010 : C_BG), false);
+            String sn = t(SEC_KEYS[i]);
+            ctx.drawText(textRenderer, sn, cx - textRenderer.getWidth(sn) / 2, dotCY + dotR + 5,
+                    active ? T_GREEN : (done ? T_GREY : T_DIM), false);
         }
     }
 
     private void renderLeft(DrawContext ctx, int wx, int wy) {
         int x = wx + 12, y = wy + TOP_H + 16, maxW = LEFT_W - 22;
-
-        // Section title
-        ctx.drawText(textRenderer, SEC_NAMES[section], x, y, T_WHITE, false);
+        ctx.drawText(textRenderer, t(SEC_KEYS[section]), x, y, T_WHITE, false);
         y += 12;
         ctx.fill(x, y, wx + LEFT_W - 10, y + 1, C_SEP);
         y += 6;
-
-        // Wrapped description
-        for (String line : wrapText(SEC_DESC[section], maxW)) {
+        for (String line : wrapText(t(DESC_KEYS[section]), maxW)) {
             ctx.drawText(textRenderer, line, x, y, T_GREY, false);
             y += 10;
         }
     }
 
-    private void renderControlsLabels(DrawContext ctx, int rx, int cy, int rw) {
-        String[] rows = {"Forward", "Back", "Left", "Right", "Attack"};
-        for (int i = 0; i < rows.length; i++) {
+    private void renderControlsLabels(DrawContext ctx, int rpx, int cy, int rpw) {
+        String[] rowKeys = {
+            "farmhelperhypixel.key.forward", "farmhelperhypixel.key.back",
+            "farmhelperhypixel.key.left",    "farmhelperhypixel.key.right",
+            "farmhelperhypixel.key.attack"
+        };
+        for (int i = 0; i < rowKeys.length; i++) {
             int ry = cy + 12 + i * 26;
-            ctx.fill(rx + 4, ry, rx + rw - 4, ry + 18, C_ITEM);
-            ctx.drawText(textRenderer, rows[i], rx + 12, ry + 5, T_MAIN, false);
+            ctx.fill(rpx + 4, ry, rpx + rpw - 4, ry + 18, C_ITEM);
+            ctx.drawText(textRenderer, t(rowKeys[i]), rpx + 12, ry + 5, T_MAIN, false);
         }
-        int ty = cy + 12 + rows.length * 26 + 10;
-        ctx.drawText(textRenderer, "Auto-attack:",     rx + 12, ty + 3,      T_GREY, false);
-        ctx.drawText(textRenderer, "Low sensitivity:", rx + 12, ty + 3 + 22, T_GREY, false);
+        int ty = cy + 12 + 5 * 26 + 10;
+        ctx.drawText(textRenderer, t("farmhelperhypixel.key.autoattack"), rpx + 12, ty + 3, T_GREY, false);
+        ctx.drawText(textRenderer, t("farmhelperhypixel.key.lowsens"),    rpx + 12, ty + 3 + 22, T_GREY, false);
     }
 
-    private void renderBindsLabels(DrawContext ctx, int rx, int cy, int rw) {
+    private void renderBindsLabels(DrawContext ctx, int rpx, int cy, int rpw) {
         List<FarmHelperConfig.CommandBind> binds = config.commandBinds;
-        if (binds.isEmpty()) {
-            ctx.drawText(textRenderer, "No binds yet.", rx + 12, cy + 16, T_DIM, false);
-        }
+        if (binds.isEmpty() && !addingBind)
+            ctx.drawText(textRenderer, t("farmhelperhypixel.empty.binds"), rpx + 12, cy + 16, T_DIM, false);
         for (int i = 0; i < binds.size(); i++) {
             FarmHelperConfig.CommandBind b = binds.get(i);
             int ry = cy + 12 + i * 26;
-            ctx.fill(rx + 4, ry, rx + rw - 4, ry + 18, C_ITEM);
-            ctx.drawText(textRenderer, "[ " + keyName(b.key) + " ]", rx + 12, ry + 5, T_GREEN, false);
+            ctx.fill(rpx + 4, ry, rpx + rpw - 4, ry + 18, C_ITEM);
+            String k = "[ " + keyName(b.key) + " ]";
+            ctx.drawText(textRenderer, k, rpx + 12, ry + 5, T_GREEN, false);
             ctx.drawText(textRenderer, "→  /" + b.command,
-                    rx + 12 + textRenderer.getWidth("[ " + keyName(b.key) + " ]") + 4, ry + 5, T_MAIN, false);
+                    rpx + 12 + textRenderer.getWidth(k) + 4, ry + 5, T_MAIN, false);
         }
     }
 
-    private void renderStatusLabels(DrawContext ctx, int rx, int cy, int rw) {
-        // Binding summary below the toggle
-        int sy = cy + 56;
-        ctx.drawText(textRenderer, "Active bindings", rx + 14, sy, T_DIM, false);
-        sy += 12;
+    private void renderInversionLabels(DrawContext ctx, int rpx, int cy, int rpw) {
+        List<FarmHelperConfig.InversionBind> invs = config.inversionBinds;
+        if (invs.isEmpty() && !addingInversion)
+            ctx.drawText(textRenderer, t("farmhelperhypixel.empty.inversions"), rpx + 12, cy + 16, T_DIM, false);
+        for (int i = 0; i < invs.size(); i++) {
+            FarmHelperConfig.InversionBind inv = invs.get(i);
+            int ry = cy + 12 + i * 26;
+            ctx.fill(rpx + 4, ry, rpx + rpw - 4, ry + 18, C_ITEM);
+            ctx.drawText(textRenderer, keyName(inv.key1), rpx + 12, ry + 5, T_GREEN, false);
+            int w1 = textRenderer.getWidth(keyName(inv.key1));
+            ctx.drawText(textRenderer, " ↔ ", rpx + 12 + w1, ry + 5, T_DIM, false);
+            ctx.drawText(textRenderer, keyName(inv.key2),
+                    rpx + 12 + w1 + textRenderer.getWidth(" ↔ "), ry + 5, T_GREEN, false);
+        }
+        if (addingInversion) {
+            int ay = cy + 12 + invs.size() * 26 + 8;
+            // ↔ separator between the two key buttons
+            ctx.drawText(textRenderer, "↔", rpx + 110, ay + 4, T_DIM, false);
+        }
+    }
 
-        String[][] rows = {
-            {"Forward",  keyName(config.forwardKey)},
-            {"Back",     keyName(config.backKey)},
-            {"Left",     keyName(config.leftKey)},
-            {"Right",    keyName(config.rightKey)},
-            {"Attack",   keyName(config.attackKey)},
-            {"Auto-attack",   config.autoAttack        ? "ON" : "OFF"},
-            {"Low sensitivity", config.reduceSensitivity ? "ON" : "OFF"},
-        };
+    private void renderFarmModeLabels(DrawContext ctx, int rpx, int cy, int rpw) {
+        int sy = cy + 58;
+        ctx.drawText(textRenderer, t("farmhelperhypixel.status.bindings"), rpx + 14, sy, T_DIM, false);
+        sy += 12;
         boolean fm = config.farmModeEnabled;
+        String[][] rows = {
+            {t("farmhelperhypixel.key.forward"), keyName(config.forwardKey)},
+            {t("farmhelperhypixel.key.back"),    keyName(config.backKey)},
+            {t("farmhelperhypixel.key.left"),    keyName(config.leftKey)},
+            {t("farmhelperhypixel.key.right"),   keyName(config.rightKey)},
+            {t("farmhelperhypixel.key.attack"),  keyName(config.attackKey)},
+            {t("farmhelperhypixel.key.autoattack"), config.autoAttack        ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off")},
+            {t("farmhelperhypixel.key.lowsens"),    config.reduceSensitivity ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off")},
+        };
         for (String[] row : rows) {
-            ctx.drawText(textRenderer, row[0] + ":", rx + 14, sy, T_DIM, false);
-            boolean isToggle = row[1].equals("ON") || row[1].equals("OFF");
-            int vc = isToggle ? (row[1].equals("ON") ? T_GREEN : T_RED)
-                              : (fm ? T_MAIN : T_DIM);
-            ctx.drawText(textRenderer, row[1], rx + 110, sy, vc, false);
+            ctx.drawText(textRenderer, row[0], rpx + 14, sy, T_DIM, false);
+            boolean toggled = row[1].equals(t("farmhelperhypixel.btn.on")) || row[1].equals(t("farmhelperhypixel.btn.off"));
+            boolean isOn = row[1].equals(t("farmhelperhypixel.btn.on"));
+            int vc = toggled ? (isOn ? T_GREEN : T_RED) : (fm ? T_MAIN : T_DIM);
+            ctx.drawText(textRenderer, row[1], rpx + 110, sy, vc, false);
             sy += 10;
         }
-
-        if (!config.commandBinds.isEmpty()) {
-            ctx.drawText(textRenderer, config.commandBinds.size() + " command bind(s)", rx + 14, sy + 2, T_DIM, false);
-        }
+        if (!config.commandBinds.isEmpty())
+            ctx.drawText(textRenderer, config.commandBinds.size() + " " + t("farmhelperhypixel.status.commandbinds"),
+                    rpx + 14, sy + 2, T_DIM, false);
     }
 
     private void renderFooter(DrawContext ctx, int wx, int wy, int mx, int my) {
-        int botY = wy + WIN_H - BOT_H;
         boolean fm = config.farmModeEnabled;
-        String statusTxt = fm ? "✓ Farm Mode active" : "○ Farm Mode off";
-        int sc = fm ? T_GREEN : T_DIM;
-        int sx = wx + (WIN_W - textRenderer.getWidth(statusTxt)) / 2;
-        ctx.drawText(textRenderer, statusTxt, sx, botY + 12, sc, false);
+        String s = fm ? t("farmhelperhypixel.status.active") : t("farmhelperhypixel.status.off");
+        ctx.drawText(textRenderer, s,
+                wx + (WIN_W - textRenderer.getWidth(s)) / 2,
+                wy + WIN_H - BOT_H + 12,
+                fm ? T_GREEN : T_DIM, false);
     }
 
     private void renderBtn(DrawContext ctx, Btn b, int mx, int my) {
-        boolean hov = mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+        int ax = windowX + b.rx, ay = windowY + b.ry;
+        boolean hov = mx >= ax && mx <= ax + b.w && my >= ay && my <= ay + b.h;
         int bg = hov ? brighten(b.bg, 22) : b.bg;
-        ctx.fill(b.x, b.y, b.x + b.w, b.y + b.h, bg);
-
-        int borderCol = b.activeBorder ? C_ACTIVE_B : C_BORDER;
-        border(ctx, b.x, b.y, b.w, b.h, borderCol);
-
-        if (hov && !b.activeBorder) {
-            ctx.fill(b.x + 1, b.y + 1, b.x + b.w - 1, b.y + 2, 0x14FFFFFF);
-        }
-
-        int tx = b.x + (b.w - textRenderer.getWidth(b.label)) / 2;
-        int ty = b.y + (b.h - 7) / 2;
+        ctx.fill(ax, ay, ax + b.w, ay + b.h, bg);
+        int bc = b.ab ? C_ACTIVE_B : C_BORDER;
+        border(ctx, ax, ay, b.w, b.h, bc);
+        if (hov && !b.ab) ctx.fill(ax + 1, ay + 1, ax + b.w - 1, ay + 2, 0x14FFFFFF);
+        int tx = ax + (b.w - textRenderer.getWidth(b.label)) / 2;
+        int ty = ay + (b.h - 7) / 2;
         ctx.drawText(textRenderer, b.label, tx, ty, hov ? brightenText(b.fg) : b.fg, false);
     }
 
@@ -391,33 +450,69 @@ public class FarmHelperScreen extends Screen {
 
     @Override
     public boolean mouseClicked(Click click, boolean bl) {
-        // Progress dot click (expanded hit area)
-        int wx = wx(), wy = wy();
-        int n = SEC_NAMES.length, dotR = 4, gap = 38;
-        int totalW = n * (dotR * 2) + (n - 1) * gap;
-        int dx0 = wx + (WIN_W - totalW) / 2;
-        int dotCY = wy + TOP_H / 2 - 2;
+        int mx = (int) click.x(), my = (int) click.y();
 
+        // Progress dot clicks
+        int n = SEC_KEYS.length, dotR = 4, gap = 28;
+        int totalW = n * (dotR * 2) + (n - 1) * gap;
+        int dx0 = windowX + (WIN_W - totalW) / 2;
+        int dotCY = windowY + TOP_H / 2 - 2;
         for (int i = 0; i < n; i++) {
             int cx = dx0 + i * (dotR * 2 + gap) + dotR;
-            if (Math.abs(click.x() - cx) <= 10 && Math.abs(click.y() - dotCY) <= 10) {
-                if (i != section) {
-                    navigateTo(i);
-                    sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.8f);
-                }
+            if (Math.abs(mx - cx) <= 10 && Math.abs(my - dotCY) <= 10) {
+                if (i != section) { navigateTo(i); sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.8f); }
                 return true;
             }
         }
 
-        // Custom buttons
+        // Custom buttons (relative → absolute)
         for (Btn b : btns) {
-            if (click.x() >= b.x && click.x() <= b.x + b.w &&
-                click.y() >= b.y && click.y() <= b.y + b.h) {
+            int ax = windowX + b.rx, ay = windowY + b.ry;
+            if (mx >= ax && mx <= ax + b.w && my >= ay && my <= ay + b.h) {
                 b.action().run();
                 return true;
             }
         }
+
+        // Start drag if clicking header
+        if (mx >= windowX && mx <= windowX + WIN_W && my >= windowY && my <= windowY + TOP_H) {
+            dragging = true;
+            dragOffX = mx - windowX;
+            dragOffY = my - windowY;
+            return true;
+        }
+
+        // Consume clicks inside window to prevent game interaction
+        if (mx >= windowX && mx <= windowX + WIN_W && my >= windowY && my <= windowY + WIN_H)
+            return true;
+
         return super.mouseClicked(click, bl);
+    }
+
+    @Override
+    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+        if (dragging && click.button() == 0) {
+            windowX = Math.max(0, Math.min(width  - WIN_W, (int) click.x() - dragOffX));
+            windowY = Math.max(0, Math.min(height - WIN_H, (int) click.y() - dragOffY));
+            if (cmdField != null) {
+                int rpx = LEFT_W + 1;
+                int bindCount = config.commandBinds.size();
+                cmdField.setX(windowX + rpx + 110);
+                cmdField.setY(windowY + TOP_H + 12 + bindCount * 26 + 8);
+            }
+            return true;
+        }
+        return super.mouseDragged(click, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+        if (dragging) {
+            dragging = false;
+            clearAndInit();
+            return true;
+        }
+        return super.mouseReleased(click);
     }
 
     @Override
@@ -425,24 +520,51 @@ public class FarmHelperScreen extends Screen {
         int k = input.key();
 
         if (capturingFor != null) {
-            switch (capturingFor) {
-                case "forward" -> config.forwardKey = k;
-                case "back"    -> config.backKey    = k;
-                case "left"    -> config.leftKey    = k;
-                case "right"   -> config.rightKey   = k;
-                case "attack"  -> config.attackKey  = k;
+            if (k != GLFW.GLFW_KEY_ESCAPE) {
+                switch (capturingFor) {
+                    case "forward" -> config.forwardKey = k;
+                    case "back"    -> config.backKey    = k;
+                    case "left"    -> config.leftKey    = k;
+                    case "right"   -> config.rightKey   = k;
+                    case "attack"  -> config.attackKey  = k;
+                }
+                config.save();
+                sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.9f);
             }
-            config.save();
-            sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.9f);
             capturingFor = null;
             clearAndInit();
             return true;
         }
 
         if (capturingNewBindKey) {
-            newBindKey = k;
+            if (k != GLFW.GLFW_KEY_ESCAPE) {
+                newBindKey = k;
+                sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.9f);
+            }
             capturingNewBindKey = false;
-            sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.9f);
+            clearAndInit();
+            return true;
+        }
+
+        if (capturingInvKey1) {
+            if (k != GLFW.GLFW_KEY_ESCAPE) {
+                newInvKey1 = k;
+                capturingInvKey1 = false;
+                if (newInvKey2 == 0) capturingInvKey2 = true;
+                sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.9f);
+            } else {
+                capturingInvKey1 = false;
+            }
+            clearAndInit();
+            return true;
+        }
+
+        if (capturingInvKey2) {
+            if (k != GLFW.GLFW_KEY_ESCAPE) {
+                newInvKey2 = k;
+                sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.9f);
+            }
+            capturingInvKey2 = false;
             clearAndInit();
             return true;
         }
@@ -457,7 +579,7 @@ public class FarmHelperScreen extends Screen {
     // ── Navigation ────────────────────────────────────────────────────────────
 
     private void goNext() {
-        if (section < SEC_NAMES.length - 1) {
+        if (section < SEC_KEYS.length - 1) {
             navigateTo(section + 1);
             sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.1f);
         } else {
@@ -475,20 +597,22 @@ public class FarmHelperScreen extends Screen {
 
     private void navigateTo(int idx) {
         section = idx;
+        lastSection = idx;
         capturingFor = null;
         addingBind = capturingNewBindKey = false;
-        newBindKey = 0;
-        pendingCmd = "";
+        addingInversion = capturingInvKey1 = capturingInvKey2 = false;
+        newBindKey = 0; pendingCmd = "";
+        newInvKey1 = 0; newInvKey2 = 0;
         clearAndInit();
     }
 
     // ── Drawing utilities ─────────────────────────────────────────────────────
 
     private void border(DrawContext ctx, int x, int y, int w, int h, int c) {
-        ctx.fill(x,       y,       x + w,   y + 1,   c);
-        ctx.fill(x,       y+h-1,   x + w,   y + h,   c);
-        ctx.fill(x,       y,       x + 1,   y + h,   c);
-        ctx.fill(x+w-1,   y,       x + w,   y + h,   c);
+        ctx.fill(x,     y,     x + w, y + 1, c);
+        ctx.fill(x,     y+h-1, x + w, y + h, c);
+        ctx.fill(x,     y,     x + 1, y + h, c);
+        ctx.fill(x+w-1, y,     x + w, y + h, c);
     }
 
     private void circle(DrawContext ctx, int cx, int cy, int r, int color) {
@@ -499,10 +623,10 @@ public class FarmHelperScreen extends Screen {
     }
 
     private static int brighten(int argb, int amt) {
-        int r = Math.min(255, ((argb >> 16) & 0xFF) + amt);
-        int g = Math.min(255, ((argb >> 8)  & 0xFF) + amt);
-        int b = Math.min(255, (argb & 0xFF)          + amt);
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
+        return 0xFF000000
+            | (Math.min(255, ((argb >> 16) & 0xFF) + amt) << 16)
+            | (Math.min(255, ((argb >> 8)  & 0xFF) + amt) << 8)
+            |  Math.min(255, (argb & 0xFF) + amt);
     }
 
     private static int brightenText(int c) {
@@ -530,6 +654,10 @@ public class FarmHelperScreen extends Screen {
 
     private void sound(net.minecraft.sound.SoundEvent se, float pitch) {
         if (client != null) client.getSoundManager().play(PositionedSoundInstance.ui(se, pitch));
+    }
+
+    private static String t(String key) {
+        return I18n.translate(key);
     }
 
     static String keyName(int key) {
