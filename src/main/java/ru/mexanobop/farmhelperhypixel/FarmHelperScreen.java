@@ -309,12 +309,14 @@ public class FarmHelperScreen extends Screen {
     }
 
     private void renderHeader(DrawContext ctx, int wx, int wy, int mx, int my) {
-        ctx.drawText(textRenderer, t("farmhelperhypixel.screen.title"), wx + 10, wy + 6, T_DIM, false);
+        // Left: mod title (small, dim)
+        ctx.drawText(textRenderer, t("farmhelperhypixel.screen.title"), wx + 10, wy + 18, T_DIM, false);
 
-        int n = SEC_KEYS.length, dotR = 4, gap = 28;
+        // Center: progress dots only (no text labels — they overlap in Russian)
+        int n = SEC_KEYS.length, dotR = 3, gap = 22;
         int totalW = n * (dotR * 2) + (n - 1) * gap;
         int dx0 = wx + (WIN_W - totalW) / 2;
-        int dotCY = wy + TOP_H / 2 - 2;
+        int dotCY = wy + TOP_H / 2;
 
         for (int i = 0; i < n; i++) {
             int cx = dx0 + i * (dotR * 2 + gap) + dotR;
@@ -326,11 +328,12 @@ public class FarmHelperScreen extends Screen {
             circle(ctx, cx, dotCY, dotR, active ? T_GREEN : (done ? C_ACTIVE_B : C_BORDER));
             String num = String.valueOf(i + 1);
             ctx.drawText(textRenderer, num, cx - textRenderer.getWidth(num) / 2, dotCY - 3,
-                    active ? 0xFF002010 : (done ? 0xFF002010 : C_BG), false);
-            String sn = t(SEC_KEYS[i]);
-            ctx.drawText(textRenderer, sn, cx - textRenderer.getWidth(sn) / 2, dotCY + dotR + 5,
-                    active ? T_GREEN : (done ? T_GREY : T_DIM), false);
+                    active ? 0xFF001A0C : (done ? 0xFF001A0C : C_BG), false);
         }
+
+        // Right: current section name
+        String secName = t(SEC_KEYS[section]);
+        ctx.drawText(textRenderer, secName, wx + WIN_W - 10 - textRenderer.getWidth(secName), wy + 18, T_WHITE, false);
     }
 
     private void renderLeft(DrawContext ctx, int wx, int wy) {
@@ -452,11 +455,11 @@ public class FarmHelperScreen extends Screen {
     public boolean mouseClicked(Click click, boolean bl) {
         int mx = (int) click.x(), my = (int) click.y();
 
-        // Progress dot clicks
-        int n = SEC_KEYS.length, dotR = 4, gap = 28;
+        // Progress dot clicks (must match renderHeader constants)
+        int n = SEC_KEYS.length, dotR = 3, gap = 22;
         int totalW = n * (dotR * 2) + (n - 1) * gap;
         int dx0 = windowX + (WIN_W - totalW) / 2;
-        int dotCY = windowY + TOP_H / 2 - 2;
+        int dotCY = windowY + TOP_H / 2;
         for (int i = 0; i < n; i++) {
             int cx = dx0 + i * (dotR * 2 + gap) + dotR;
             if (Math.abs(mx - cx) <= 10 && Math.abs(my - dotCY) <= 10) {

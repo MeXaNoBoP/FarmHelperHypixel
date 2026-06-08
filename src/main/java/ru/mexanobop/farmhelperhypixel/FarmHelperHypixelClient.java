@@ -7,6 +7,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.hit.EntityHitResult;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashMap;
@@ -69,8 +70,12 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
             return;
         }
 
-        if (config.autoAttack) holdAttack(client);
-        else releaseAttack(client);
+        // Auto-attack: only hold attack when targeting an entity, not a block
+        if (config.autoAttack && client.crosshairTarget instanceof EntityHitResult) {
+            holdAttack(client);
+        } else {
+            releaseAttack(client);
+        }
 
         long handle = client.getWindow().getHandle();
 
@@ -99,21 +104,25 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
                 if (state == 1) {
                     state = 0;
                     KeyBinding.setKeyPressed(k1, false);
+                    setBindingPressed(client, inv.key1, false);
                 } else {
-                    if (state == 2) KeyBinding.setKeyPressed(k2, false);
+                    if (state == 2) { KeyBinding.setKeyPressed(k2, false); setBindingPressed(client, inv.key2, false); }
                     state = 1;
-                    KeyBinding.setKeyPressed(k1, true);
                 }
             } else if (p2 && !was2) {
                 if (state == 2) {
                     state = 0;
                     KeyBinding.setKeyPressed(k2, false);
+                    setBindingPressed(client, inv.key2, false);
                 } else {
-                    if (state == 1) KeyBinding.setKeyPressed(k1, false);
+                    if (state == 1) { KeyBinding.setKeyPressed(k1, false); setBindingPressed(client, inv.key1, false); }
                     state = 2;
-                    KeyBinding.setKeyPressed(k2, true);
                 }
             }
+
+            // Re-apply every tick — Minecraft resets pressed states via updatePressedStates() each frame
+            if (state == 1) { KeyBinding.setKeyPressed(k1, true); setBindingPressed(client, inv.key1, true); }
+            else if (state == 2) { KeyBinding.setKeyPressed(k2, true); setBindingPressed(client, inv.key2, true); }
 
             invState.put(i, state);
             invPrev1.put(i, p1);
@@ -166,6 +175,20 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
         pressedLastTick.clear();
         KeyBinding.updateKeysByCode();
         client.options.write();
+    }
+
+    private static void setBindingPressed(MinecraftClient client, int glfwKey, boolean pressed) {
+        if (client.options == null) return;
+        InputUtil.Key target = InputUtil.Type.KEYSYM.createFromCode(glfwKey);
+        for (KeyBinding b : new KeyBinding[]{
+                client.options.forwardKey, client.options.backKey,
+                client.options.leftKey,   client.options.rightKey,
+                client.options.attackKey, client.options.jumpKey,
+                client.options.sneakKey,  client.options.sprintKey}) {
+            if (InputUtil.fromTranslationKey(b.getBoundKeyTranslationKey()).equals(target)) {
+                b.setPressed(pressed);
+            }
+        }
     }
 
     static void releaseInversions() {
