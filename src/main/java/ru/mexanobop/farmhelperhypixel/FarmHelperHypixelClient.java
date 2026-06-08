@@ -235,25 +235,36 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
     private static boolean isCrop(Block b) {
         return b == Blocks.WHEAT || b == Blocks.CARROTS || b == Blocks.POTATOES
             || b == Blocks.NETHER_WART || b == Blocks.SUGAR_CANE || b == Blocks.COCOA
-            || b == Blocks.CACTUS || b == Blocks.MELON || b == Blocks.PUMPKIN
-            || b == Blocks.CORNFLOWER;
+            || b == Blocks.CACTUS || b == Blocks.MELON || b == Blocks.CARVED_PUMPKIN
+            || b == Blocks.BLUE_ORCHID || b == Blocks.SUNFLOWER;
     }
 
     private static void recordCropBreak(Block block) {
         String key = null;
-        if      (block == Blocks.WHEAT)       key = "wheat";
-        else if (block == Blocks.CARROTS)     key = "carrot";
-        else if (block == Blocks.POTATOES)    key = "potato";
-        else if (block == Blocks.NETHER_WART) key = "nether_wart";
-        else if (block == Blocks.SUGAR_CANE)  key = "sugar_cane";
-        else if (block == Blocks.COCOA)       key = "cocoa";
-        else if (block == Blocks.CACTUS)      key = "cactus";
-        else if (block == Blocks.MELON)       key = "melon";
-        else if (block == Blocks.PUMPKIN)     key = "pumpkin";
-        else if (block == Blocks.CORNFLOWER)  key = "cornflower";
+        if      (block == Blocks.WHEAT)          key = "wheat";
+        else if (block == Blocks.CARROTS)        key = "carrot";
+        else if (block == Blocks.POTATOES)       key = "potato";
+        else if (block == Blocks.NETHER_WART)    key = "nether_wart";
+        else if (block == Blocks.SUGAR_CANE)     key = "sugar_cane";
+        else if (block == Blocks.BLUE_ORCHID)    key = "blue_orchid";
+        else if (block == Blocks.COCOA)          key = "cocoa";
+        else if (block == Blocks.CACTUS)         key = "cactus";
+        else if (block == Blocks.MELON)          key = "melon";
+        else if (block == Blocks.CARVED_PUMPKIN) key = "pumpkin";
+        else if (block == Blocks.SUNFLOWER)      key = "sunflower";
         if (key == null) return;
         FarmHelperConfig.CropStats stats = config.cropStats.computeIfAbsent(key, k -> new FarmHelperConfig.CropStats());
-        if (stats.startTime == 0) stats.startTime = System.currentTimeMillis();
+        long now = System.currentTimeMillis();
+        if (stats.lastBreakTime == 0) {
+            // First break ever — start counting from zero
+            stats.lastBreakTime = now;
+            stats.activeMs = 0;
+        } else {
+            long gap = now - stats.lastBreakTime;
+            if (gap <= 5000) stats.activeMs += gap; // active gap → add it
+            // gap > 5s → pause was discarded, don't add idle time
+            stats.lastBreakTime = now;
+        }
         stats.count++;
         config.save();
     }

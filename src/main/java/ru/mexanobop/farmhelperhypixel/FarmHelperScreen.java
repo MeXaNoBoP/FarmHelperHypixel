@@ -60,18 +60,19 @@ public class FarmHelperScreen extends Screen {
         "farmhelperhypixel.desc.crops"
     };
 
-    // ── Crop icons ────────────────────────────────────────────────────────────
+    // ── Crop icons (order matches FarmHelperConfig.CROP_KEYS) ────────────────
     private static final ItemStack[] CROP_ICONS = {
         new ItemStack(Items.WHEAT),
         new ItemStack(Items.CARROT),
         new ItemStack(Items.POTATO),
         new ItemStack(Items.NETHER_WART),
         new ItemStack(Items.SUGAR_CANE),
+        new ItemStack(Items.BLUE_ORCHID),     // MoonFlower
         new ItemStack(Items.COCOA_BEANS),
         new ItemStack(Items.CACTUS),
         new ItemStack(Items.MELON),
-        new ItemStack(Items.PUMPKIN),
-        new ItemStack(Items.CORNFLOWER),
+        new ItemStack(Items.CARVED_PUMPKIN),  // carved
+        new ItemStack(Items.SUNFLOWER),       // SunFlower
     };
 
     // ── Persistent state ──────────────────────────────────────────────────────
@@ -298,12 +299,12 @@ public class FarmHelperScreen extends Screen {
     }
 
     private void buildCropsBtns(int rpx, int cy, int rpw) {
-        // Reset All button at bottom of crop list
-        btn(rpx + rpw / 2 - 52, cy + 138, 104, 16,
+        // 6 rows left + 5 rows right, rowH=24, startY=cy+10 → bottom at cy+10+6*24=cy+154
+        btn(rpx + rpw / 2 - 52, cy + 162, 104, 16,
                 t("farmhelperhypixel.crops.resetall"), C_ITEM, T_RED, false, () -> {
                     for (String key : FarmHelperConfig.CROP_KEYS) {
                         FarmHelperConfig.CropStats s = config.cropStats.get(key);
-                        if (s != null) { s.startTime = 0; s.count = 0; }
+                        if (s != null) { s.lastBreakTime = 0; s.activeMs = 0; s.count = 0; }
                     }
                     config.save();
                     sound(SoundEvents.ENTITY_GENERIC_EXTINGUISH_FIRE, 0.8f);
@@ -492,49 +493,50 @@ public class FarmHelperScreen extends Screen {
     }
 
     private void renderCropsLabels(DrawContext ctx, int rpx, int cy, int rpw) {
+        // 11 crops: left col = indices 0-5 (6 rows), right col = indices 6-10 (5 rows)
         String[] names = {
-            t("farmhelperhypixel.crop.wheat"),   t("farmhelperhypixel.crop.carrot"),
-            t("farmhelperhypixel.crop.potato"),  t("farmhelperhypixel.crop.nether_wart"),
-            t("farmhelperhypixel.crop.sugar_cane"),
-            t("farmhelperhypixel.crop.cocoa"),   t("farmhelperhypixel.crop.cactus"),
-            t("farmhelperhypixel.crop.melon"),   t("farmhelperhypixel.crop.pumpkin"),
-            t("farmhelperhypixel.crop.cornflower"),
+            t("farmhelperhypixel.crop.wheat"),       t("farmhelperhypixel.crop.carrot"),
+            t("farmhelperhypixel.crop.potato"),      t("farmhelperhypixel.crop.nether_wart"),
+            t("farmhelperhypixel.crop.sugar_cane"),  t("farmhelperhypixel.crop.blue_orchid"),
+            t("farmhelperhypixel.crop.cocoa"),       t("farmhelperhypixel.crop.cactus"),
+            t("farmhelperhypixel.crop.melon"),       t("farmhelperhypixel.crop.pumpkin"),
+            t("farmhelperhypixel.crop.sunflower"),
         };
 
-        int colW   = (rpw - 10) / 2;   // ~158px per column
+        int colW   = (rpw - 10) / 2;
         int col0x  = rpx + 4;
         int col1x  = rpx + 4 + colW + 2;
         int rowH   = 24;
         int startY = cy + 10;
+        long now   = System.currentTimeMillis();
 
-        for (int i = 0; i < 10; i++) {
-            int col  = i < 5 ? 0 : 1;
-            int row  = i < 5 ? i : i - 5;
-            int cx   = col == 0 ? col0x : col1x;
-            int ry   = startY + row * rowH;
+        for (int i = 0; i < 11; i++) {
+            int col = i < 6 ? 0 : 1;
+            int row = i < 6 ? i : i - 6;
+            int cx  = col == 0 ? col0x : col1x;
+            int ry  = startY + row * rowH;
 
             ctx.fill(cx, ry, cx + colW, ry + 20, C_ITEM);
             border(ctx, cx, ry, colW, 20, C_BORDER);
-
             ctx.drawItem(CROP_ICONS[i], cx + 2, ry + 2);
-
-            // Crop name (truncate if too wide)
             ctx.drawText(textRenderer, names[i], cx + 20, ry + 3, T_MAIN, false);
 
             FarmHelperConfig.CropStats stats = config.cropStats.get(FarmHelperConfig.CROP_KEYS[i]);
-            if (stats == null || stats.startTime == 0) {
+            if (stats == null || stats.lastBreakTime == 0) {
                 ctx.drawText(textRenderer, "--:--:--", cx + 20, ry + 12, T_DIM, false);
             } else {
-                String time  = formatCropTime(System.currentTimeMillis() - stats.startTime);
-                String count = "×" + stats.count;
-                ctx.drawText(textRenderer, time,  cx + 20, ry + 12, T_GREY, false);
+                long idle      = now - stats.lastBreakTime;
+                long displayMs = stats.activeMs + (idle < 5000 ? idle : 0);
+                String time    = formatCropTime(displayMs);
+                String count   = "×" + stats.count;
+                int timerColor = idle < 5000 ? T_GREY : T_DIM; // dim when paused
+                ctx.drawText(textRenderer, time,  cx + 20, ry + 12, timerColor, false);
                 ctx.drawText(textRenderer, count,
                         cx + colW - 3 - textRenderer.getWidth(count), ry + 12, T_GREEN, false);
             }
         }
 
-        // Vertical separator between columns
-        ctx.fill(col1x - 2, cy + 8, col1x - 1, cy + 138, C_SEP);
+        ctx.fill(col1x - 2, cy + 8, col1x - 1, cy + 162, C_SEP);
     }
 
     private static String formatCropTime(long ms) {

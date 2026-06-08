@@ -54,13 +54,14 @@ public class FarmHelperConfig {
     }
 
     public static final String[] CROP_KEYS = {
-        "wheat", "carrot", "potato", "nether_wart", "sugar_cane",
-        "cocoa", "cactus", "melon", "pumpkin", "cornflower"
+        "wheat", "carrot", "potato", "nether_wart", "sugar_cane", "blue_orchid",
+        "cocoa", "cactus", "melon", "pumpkin", "sunflower"
     };
 
     public static class CropStats {
-        public long startTime = 0; // epoch ms of first break, 0 = never
-        public int  count     = 0;
+        public long lastBreakTime = 0; // epoch ms of last break, 0 = never
+        public long activeMs      = 0; // accumulated active farming ms
+        public int  count         = 0;
     }
 
     public Map<String, CropStats> cropStats = new LinkedHashMap<>();
