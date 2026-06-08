@@ -15,43 +15,53 @@ import java.util.List;
 
 public class FarmHelperScreen extends Screen {
 
-    // Window layout
-    private static final int WIN_W  = 368;
-    private static final int WIN_H  = 268;
-    private static final int TITLE_H = 28;  // title bar height
-    private static final int TOOL_Y  = TITLE_H + 4;   // toolbar top
-    private static final int TOOL_H  = 16;
-    private static final int CONT_Y  = TOOL_Y + TOOL_H + 6; // content top (= 54)
+    // ── Layout ────────────────────────────────────────────────────────────────
+    private static final int WIN_W  = 504;
+    private static final int WIN_H  = 324;
+    private static final int TOP_H  = 40;   // header with progress dots
+    private static final int BOT_H  = 32;   // bottom navigation bar
+    private static final int LEFT_W = 176;  // description panel width
 
-    // Button colors
-    private static final int C_BTN      = 0xFF002800;
-    private static final int C_BTN_ON   = 0xFF005522;
-    private static final int C_BTN_OFF  = 0xFF2A0000;
-    private static final int C_BTN_DEL  = 0xFF3A0000;
-    private static final int C_CAPTURE  = 0xFF006611;
+    // ── Colors ────────────────────────────────────────────────────────────────
+    private static final int C_BG       = 0xFF0C0C0C;
+    private static final int C_LEFT     = 0xFF0F0F0F;
+    private static final int C_SEP      = 0xFF1E1E1E;
+    private static final int C_BORDER   = 0xFF232323;
+    private static final int C_ITEM     = 0xFF161616;
+    private static final int C_ACTIVE   = 0xFF0C3526;
+    private static final int C_ACTIVE_B = 0xFF1D6247; // active border
+    private static final int C_BTN      = 0xFF181818;
+    private static final int C_HEADER   = 0xFF080808;
 
-    // Text colors
-    private static final int T_MAIN  = 0xFFCCEECC;
-    private static final int T_ON    = 0xFF55FF88;
-    private static final int T_OFF   = 0xFFFF5555;
-    private static final int T_LABEL = 0xFF779977;
+    // ── Text ──────────────────────────────────────────────────────────────────
+    private static final int T_WHITE  = 0xFFFFFFFF;
+    private static final int T_MAIN   = 0xFFE8E8E8;
+    private static final int T_GREY   = 0xFF999999;
+    private static final int T_DIM    = 0xFF555555;
+    private static final int T_GREEN  = 0xFF5BE38B;
+    private static final int T_RED    = 0xFFE35B5B;
 
+    // ── Sections ──────────────────────────────────────────────────────────────
+    private static final String[] SEC_NAMES = {"Controls", "Commands", "Farm Mode"};
+    private static final String[] SEC_DESC  = {
+        "Rebind the keys that are active when farm mode is enabled. Movement and attack keys will be remapped to your chosen bindings.",
+        "Add key-to-command bindings. While farm mode is on, pressing the bound key will send the command to the server automatically.",
+        "Toggle farm mode on or off. When active, all your key bindings and settings are applied. Press F8 at any time to open this menu."
+    };
+
+    // ── State ─────────────────────────────────────────────────────────────────
     private final FarmHelperConfig config;
-
-    private String  section            = "controls";
-    private boolean dropdownOpen       = false;
-    private String  capturingFor       = null;
-    private boolean addingBind         = false;
+    private int     section             = 0;
+    private String  capturingFor        = null;
+    private boolean addingBind          = false;
     private boolean capturingNewBindKey = false;
-    private int     newBindKey         = 0;
-    private String  pendingCommandText = "";
+    private int     newBindKey          = 0;
+    private String  pendingCmd          = "";
+    private TextFieldWidget cmdField    = null;
+    private long    openTime            = 0;
 
-    private TextFieldWidget commandField = null;
-    private long openTime = 0;
-
-    // Custom buttons rebuilt on state change
-    private record Btn(int x, int y, int w, int h, String label, int bg, int fg, Runnable action) {}
-    private final List<Btn> buttons = new ArrayList<>();
+    private record Btn(int x, int y, int w, int h, String label, int bg, int fg, boolean activeBorder, Runnable action) {}
+    private final List<Btn> btns = new ArrayList<>();
 
     public FarmHelperScreen(FarmHelperConfig config) {
         super(Text.literal("FarmHelperHypixel"));
@@ -61,160 +71,133 @@ public class FarmHelperScreen extends Screen {
     private int wx() { return (width  - WIN_W) / 2; }
     private int wy() { return (height - WIN_H) / 2; }
 
-    // ── Init ─────────────────────────────────────────────────────────────────
+    // ── Init ──────────────────────────────────────────────────────────────────
 
     @Override
     protected void init() {
         if (openTime == 0) {
             openTime = System.currentTimeMillis();
-            client.getSoundManager().play(
-                PositionedSoundInstance.ui(SoundEvents.BLOCK_NOTE_BLOCK_PLING, 1.6f));
+            client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.BLOCK_NOTE_BLOCK_PLING, 1.6f));
         }
         clearChildren();
-        buttons.clear();
+        btns.clear();
+        cmdField = null;
         buildButtons();
     }
 
     private void buildButtons() {
         int wx = wx(), wy = wy();
-        int toolY   = wy + TOOL_Y;
-        int contY   = wy + CONT_Y;
+        int rx  = wx + LEFT_W + 1;
+        int rw  = WIN_W - LEFT_W - 2;
+        int cy  = wy + TOP_H;
+        int by  = wy + WIN_H - BOT_H;
 
-        // Dropdown
-        String dropLabel = (section.equals("controls") ? "Controls" : "Binds") + " ▼";
-        btn(wx + 8, toolY, 95, TOOL_H, dropLabel, C_BTN, T_MAIN, () -> {
-            dropdownOpen = !dropdownOpen;
-            sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.0f);
-        });
+        // Right panel buttons per section
+        switch (section) {
+            case 0 -> buildControlBtns(rx, cy, rw);
+            case 1 -> buildBindBtns(wx, rx, cy, rw);
+            case 2 -> buildStatusBtns(rx, cy, rw);
+        }
 
-        // Farm Mode toggle
-        boolean fm = config.farmModeEnabled;
-        btn(wx + WIN_W - 140, toolY, 132, TOOL_H,
-                fm ? "✓  Farm Mode  ON" : "✗  Farm Mode  OFF",
-                fm ? C_BTN_ON : C_BTN_OFF,
-                fm ? T_ON : T_OFF,
-                () -> {
-                    config.farmModeEnabled = !config.farmModeEnabled;
-                    config.save();
-                    sound(config.farmModeEnabled
-                            ? SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP
-                            : SoundEvents.BLOCK_LEVER_CLICK,
-                            config.farmModeEnabled ? 1.6f : 0.8f);
-                    clearAndInit();
-                });
+        // Back
+        if (section > 0)
+            btn(wx + 10, by + 8, 62, 16, "← Back", C_BTN, T_GREY, false, this::goBack);
 
-        if (section.equals("controls")) buildControlBtns(wx, contY);
-        else                            buildBindBtns(wx, contY);
+        // Next / Done
+        boolean last = section == SEC_NAMES.length - 1;
+        btn(wx + WIN_W - 84, by + 8, 74, 16,
+                last ? "Done  ✓" : "Next  →",
+                last ? C_ACTIVE : C_BTN,
+                last ? T_GREEN : T_MAIN,
+                last, this::goNext);
     }
 
-    private void buildControlBtns(int wx, int contY) {
+    private void buildControlBtns(int rx, int cy, int rw) {
         String[] labels  = {"Forward", "Back", "Left", "Right", "Attack"};
-        int[]    keys    = {config.forwardKey, config.backKey, config.leftKey,
-                            config.rightKey, config.attackKey};
+        int[]    keys    = {config.forwardKey, config.backKey, config.leftKey, config.rightKey, config.attackKey};
         String[] actions = {"forward", "back", "left", "right", "attack"};
 
         for (int i = 0; i < labels.length; i++) {
             final String act = actions[i];
-            final int    key = keys[i];
             boolean cap = act.equals(capturingFor);
-            btn(wx + WIN_W - 128, contY + i * 22, 120, 16,
-                    cap ? "  Press a key…  " : "  " + keyName(key) + "  ",
-                    cap ? C_CAPTURE : C_BTN,
-                    cap ? T_ON : T_MAIN,
-                    () -> {
-                        capturingFor = act;
-                        sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f);
-                        clearAndInit();
-                    });
+            String lbl = cap ? "Press a key…" : keyName(keys[i]);
+            btn(rx + rw - 102, cy + 12 + i * 26, 96, 16,
+                    lbl, cap ? C_ACTIVE : C_ITEM, cap ? T_GREEN : T_MAIN, cap,
+                    () -> { capturingFor = act; sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f); clearAndInit(); });
         }
 
-        int togY = contY + labels.length * 22 + 10;
-
+        int ty = cy + 12 + labels.length * 26 + 10;
         boolean aa = config.autoAttack;
-        btn(wx + WIN_W - 80, togY, 72, 16, aa ? "ON" : "OFF",
-                aa ? C_BTN_ON : C_BTN_OFF, aa ? T_ON : T_OFF, () -> {
-                    config.autoAttack = !config.autoAttack;
-                    config.save();
-                    sound(config.autoAttack ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
-                            config.autoAttack ? 1.6f : 0.8f);
-                    clearAndInit();
-                });
+        btn(rx + rw - 56, ty, 50, 14, aa ? "ON" : "OFF",
+                aa ? C_ACTIVE : C_ITEM, aa ? T_GREEN : T_RED, aa,
+                () -> { config.autoAttack = !config.autoAttack; config.save();
+                        sound(config.autoAttack ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
+                              config.autoAttack ? 1.6f : 0.8f); clearAndInit(); });
 
         boolean rs = config.reduceSensitivity;
-        btn(wx + WIN_W - 80, togY + 22, 72, 16, rs ? "ON" : "OFF",
-                rs ? C_BTN_ON : C_BTN_OFF, rs ? T_ON : T_OFF, () -> {
-                    config.reduceSensitivity = !config.reduceSensitivity;
-                    config.save();
-                    sound(config.reduceSensitivity ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
-                            config.reduceSensitivity ? 1.6f : 0.8f);
-                    clearAndInit();
-                });
+        btn(rx + rw - 56, ty + 22, 50, 14, rs ? "ON" : "OFF",
+                rs ? C_ACTIVE : C_ITEM, rs ? T_GREEN : T_RED, rs,
+                () -> { config.reduceSensitivity = !config.reduceSensitivity; config.save();
+                        sound(config.reduceSensitivity ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
+                              config.reduceSensitivity ? 1.6f : 0.8f); clearAndInit(); });
     }
 
-    private void buildBindBtns(int wx, int contY) {
+    private void buildBindBtns(int wx, int rx, int cy, int rw) {
         List<FarmHelperConfig.CommandBind> binds = config.commandBinds;
-
         for (int i = 0; i < binds.size(); i++) {
             final int idx = i;
-            btn(wx + WIN_W - 30, contY + i * 22, 22, 16, "✕", C_BTN_DEL, T_OFF, () -> {
-                config.commandBinds.remove(idx);
-                config.save();
-                sound(SoundEvents.BLOCK_LEVER_CLICK, 0.7f);
-                clearAndInit();
-            });
+            btn(rx + rw - 24, cy + 12 + i * 26, 18, 16, "✕", C_ITEM, T_RED, false,
+                () -> { config.commandBinds.remove(idx); config.save();
+                        sound(SoundEvents.BLOCK_LEVER_CLICK, 0.7f); clearAndInit(); });
         }
 
-        int addY = contY + binds.size() * 22 + 8;
+        int ay = cy + 12 + binds.size() * 26 + 8;
 
         if (addingBind) {
             boolean capK = capturingNewBindKey;
-            String keyLabel = capK ? "  Press a key…  "
-                    : (newBindKey == 0 ? "  [ Set key ]  " : "  " + keyName(newBindKey) + "  ");
-            btn(wx + 8, addY, 108, 16, keyLabel,
-                    capK ? C_CAPTURE : (newBindKey != 0 ? C_BTN_ON : C_BTN),
-                    capK ? T_ON      : (newBindKey != 0 ? T_ON     : T_MAIN),
-                    () -> {
-                        capturingNewBindKey = true;
-                        sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f);
-                        clearAndInit();
-                    });
+            String kl = capK ? "Press a key…" : (newBindKey == 0 ? "[ Set key ]" : keyName(newBindKey));
+            btn(rx + 6, ay, 96, 16, kl,
+                    (capK || newBindKey != 0) ? C_ACTIVE : C_ITEM,
+                    (capK || newBindKey != 0) ? T_GREEN : T_GREY,
+                    newBindKey != 0 && !capK,
+                    () -> { capturingNewBindKey = true; sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f); clearAndInit(); });
 
-            commandField = new TextFieldWidget(textRenderer, wx + 124, addY, 138, 16, Text.empty());
-            commandField.setPlaceholder(Text.literal("/command…"));
-            commandField.setText(pendingCommandText);
-            commandField.setChangedListener(t -> pendingCommandText = t);
-            addDrawableChild(commandField);
-            if (newBindKey != 0) setFocused(commandField);
+            cmdField = new TextFieldWidget(textRenderer, rx + 110, ay, rw - 142, 16, Text.empty());
+            cmdField.setPlaceholder(Text.literal("/command…"));
+            cmdField.setText(pendingCmd);
+            cmdField.setChangedListener(t -> pendingCmd = t);
+            addDrawableChild(cmdField);
+            if (newBindKey != 0) setFocused(cmdField);
 
-            btn(wx + 270, addY, 22, 16, "✓", C_BTN_ON, T_ON, () -> {
-                String cmd = pendingCommandText.replaceFirst("^/", "").trim();
+            btn(rx + rw - 24, ay, 18, 16, "✓", C_ACTIVE, T_GREEN, true, () -> {
+                String cmd = pendingCmd.replaceFirst("^/", "").trim();
                 if (newBindKey != 0 && !cmd.isEmpty()) {
                     config.commandBinds.add(new FarmHelperConfig.CommandBind(newBindKey, cmd));
                     config.save();
                     sound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f);
-                    addingBind = false; capturingNewBindKey = false;
-                    newBindKey = 0; pendingCommandText = "";
+                    addingBind = capturingNewBindKey = false;
+                    newBindKey = 0; pendingCmd = "";
                     clearAndInit();
                 }
             });
-
-            btn(wx + 296, addY, 22, 16, "✗", C_BTN_DEL, T_OFF, () -> {
-                addingBind = false; capturingNewBindKey = false;
-                newBindKey = 0; pendingCommandText = "";
-                sound(SoundEvents.BLOCK_LEVER_CLICK, 0.7f);
-                clearAndInit();
-            });
         } else {
-            btn(wx + 8, addY, 92, 16, "+ Add Bind", C_BTN, T_MAIN, () -> {
-                addingBind = true;
-                sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.2f);
-                clearAndInit();
-            });
+            btn(rx + 6, ay, 96, 16, "+ Add Bind", C_ITEM, T_GREY, false,
+                () -> { addingBind = true; sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.2f); clearAndInit(); });
         }
     }
 
-    private void btn(int x, int y, int w, int h, String label, int bg, int fg, Runnable action) {
-        buttons.add(new Btn(x, y, w, h, label, bg, fg, action));
+    private void buildStatusBtns(int rx, int cy, int rw) {
+        boolean fm = config.farmModeEnabled;
+        btn(rx + 10, cy + 18, rw - 20, 28,
+                fm ? "✓   Farm Mode is ON" : "✗   Farm Mode is OFF",
+                fm ? C_ACTIVE : C_ITEM, fm ? T_GREEN : T_RED, fm,
+                () -> { config.farmModeEnabled = !config.farmModeEnabled; config.save();
+                        sound(config.farmModeEnabled ? SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
+                              config.farmModeEnabled ? 1.6f : 0.8f); clearAndInit(); });
+    }
+
+    private void btn(int x, int y, int w, int h, String label, int bg, int fg, boolean ab, Runnable action) {
+        btns.add(new Btn(x, y, w, h, label, bg, fg, ab, action));
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -223,201 +206,211 @@ public class FarmHelperScreen extends Screen {
     public void render(DrawContext ctx, int mx, int my, float delta) {
         long time = System.currentTimeMillis();
         int wx = wx(), wy = wy();
+        float fade = Math.min(1.0f, (time - openTime) / 180f);
 
-        // Dim overlay — fades in quickly
-        float fadeIn = Math.min(1.0f, (time - openTime) / 180f);
-        ctx.fill(0, 0, width, height, argb(0x99, fadeIn));
+        // Dim overlay
+        ctx.fill(0, 0, width, height, (int)(0xCC * fade) << 24);
 
-        // Gradient background (8 bands)
-        float shimmer = (float)(Math.sin(time / 2200.0) * 0.5 + 0.5);
-        for (int i = 0; i < 8; i++) {
-            int bY  = wy + (WIN_H * i) / 8;
-            int bY2 = wy + (WIN_H * (i + 1)) / 8;
-            int g = (int)(18 + (i / 7.0f) * 22 + shimmer * 16);
-            ctx.fill(wx, bY, wx + WIN_W, bY2, 0xFF000000 | (g << 8));
+        // Window panels
+        ctx.fill(wx, wy, wx + WIN_W, wy + WIN_H, C_BG);
+        ctx.fill(wx, wy + TOP_H, wx + LEFT_W, wy + WIN_H - BOT_H, C_LEFT);
+        ctx.fill(wx, wy, wx + WIN_W, wy + TOP_H, C_HEADER);
+        ctx.fill(wx, wy + WIN_H - BOT_H, wx + WIN_W, wy + WIN_H, C_HEADER);
+
+        // Borders & separators
+        border(ctx, wx, wy, WIN_W, WIN_H, C_BORDER);
+        ctx.fill(wx + 1, wy + TOP_H,             wx + WIN_W - 1, wy + TOP_H + 1,         C_SEP);
+        ctx.fill(wx + 1, wy + WIN_H - BOT_H,     wx + WIN_W - 1, wy + WIN_H - BOT_H + 1, C_SEP);
+        ctx.fill(wx + LEFT_W, wy + TOP_H + 1, wx + LEFT_W + 1, wy + WIN_H - BOT_H - 1, C_SEP);
+
+        // Header
+        renderHeader(ctx, wx, wy, mx, my);
+
+        // Left description panel
+        renderLeft(ctx, wx, wy);
+
+        // Right content panel labels
+        int rx = wx + LEFT_W + 1, rw = WIN_W - LEFT_W - 2, cy = wy + TOP_H;
+        switch (section) {
+            case 0 -> renderControlsLabels(ctx, rx, cy, rw);
+            case 1 -> renderBindsLabels(ctx, rx, cy, rw);
+            case 2 -> renderStatusLabels(ctx, rx, cy, rw);
         }
 
-        // Title bar (darker)
-        ctx.fill(wx, wy, wx + WIN_W, wy + TITLE_H, 0xFF000B00);
-
-        // Animated title
-        float pulse = (float)(Math.sin(time / 650.0) * 0.5 + 0.5);
-        int tr = (int)(100 + pulse * 100);
-        int tg = 230;
-        int tb = (int)(100 + pulse * 100);
-        int titleCol = 0xFF000000 | (tr << 16) | (tg << 8) | tb;
-        String titleText = "✶  F A R M H E L P E R  ✶";
-        int tw = textRenderer.getWidth(titleText);
-        ctx.drawText(textRenderer, titleText, wx + (WIN_W - tw) / 2, wy + 10, titleCol, true);
-
-        // Borders
-        ctx.fill(wx,           wy,            wx + WIN_W,     wy + 2,             0xFF000000);
-        ctx.fill(wx,           wy + WIN_H - 2, wx + WIN_W,    wy + WIN_H,         0xFF000000);
-        ctx.fill(wx,           wy,            wx + 2,          wy + WIN_H,         0xFF000000);
-        ctx.fill(wx + WIN_W-2, wy,            wx + WIN_W,      wy + WIN_H,         0xFF000000);
-        // Inner highlight glow
-        ctx.fill(wx + 2, wy + 2, wx + WIN_W - 2, wy + 3,             0x22006600);
-        ctx.fill(wx + 2, wy + 2, wx + 3,         wy + WIN_H - 2,     0x22006600);
-
-        // Separators
-        ctx.fill(wx + 2, wy + TITLE_H,             wx + WIN_W - 2, wy + TITLE_H + 1,     0x88003800);
-        ctx.fill(wx + 2, wy + TOOL_Y + TOOL_H + 2, wx + WIN_W - 2, wy + TOOL_Y + TOOL_H + 3, 0x55003300);
-
-        // Section labels
-        int contY = wy + CONT_Y;
-        if (section.equals("controls")) {
-            String[] rowLabels = {"Forward", "Back", "Left", "Right", "Attack"};
-            for (int i = 0; i < rowLabels.length; i++)
-                ctx.drawText(textRenderer, rowLabels[i] + ":", wx + 14, contY + i * 22 + 4, T_LABEL, true);
-            int togY = contY + rowLabels.length * 22 + 10;
-            ctx.drawText(textRenderer, "Auto-attack:",     wx + 14, togY + 4,      T_LABEL, true);
-            ctx.drawText(textRenderer, "Low sensitivity:", wx + 14, togY + 22 + 4, T_LABEL, true);
-        } else {
-            List<FarmHelperConfig.CommandBind> binds = config.commandBinds;
-            if (binds.isEmpty())
-                ctx.drawText(textRenderer, "No binds yet. Add one below.", wx + 14, contY + 4, T_LABEL, true);
-            for (int i = 0; i < binds.size(); i++) {
-                FarmHelperConfig.CommandBind b = binds.get(i);
-                ctx.drawText(textRenderer, "[ " + keyName(b.key) + " ]  →  /" + b.command,
-                        wx + 14, contY + i * 22 + 4, T_MAIN, true);
-            }
-        }
-
-        // Decorative diamonds
-        renderDiamonds(ctx, wx, wy, time);
+        // Footer
+        renderFooter(ctx, wx, wy, mx, my);
 
         // Custom buttons
-        for (Btn b : buttons) drawBtn(ctx, b, mx, my, time);
+        for (Btn b : btns) renderBtn(ctx, b, mx, my);
 
-        // Real widgets (TextFieldWidget)
+        // Real widgets
         super.render(ctx, mx, my, delta);
-
-        // Dropdown on top (must be after super.render so it's on top layer)
-        if (dropdownOpen) renderDropdown(ctx, wx, wy, mx, my);
     }
 
-    private void drawBtn(DrawContext ctx, Btn b, int mx, int my, long time) {
-        boolean hov = mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
-        int bg = b.bg;
-        if (hov) {
-            int r = (bg >> 16) & 0xFF;
-            int g = Math.min(255, ((bg >> 8) & 0xFF) + 35);
-            int bl = bg & 0xFF;
-            bg = 0xFF000000 | (r << 16) | (g << 8) | bl;
+    private void renderHeader(DrawContext ctx, int wx, int wy, int mx, int my) {
+        // Mod name (left)
+        ctx.drawText(textRenderer, "FarmHelperHypixel", wx + 10, wy + 6, T_DIM, false);
+
+        // Progress dots centered
+        int n = SEC_NAMES.length;
+        int dotR = 4, gap = 38;
+        int totalW = n * (dotR * 2) + (n - 1) * gap;
+        int dx0 = wx + (WIN_W - totalW) / 2;
+        int dotCY = wy + TOP_H / 2 - 2;
+
+        for (int i = 0; i < n; i++) {
+            int cx = dx0 + i * (dotR * 2 + gap) + dotR;
+
+            // Connecting line to next dot
+            if (i < n - 1) {
+                int lx1 = cx + dotR + 2, lx2 = cx + dotR + gap - 1;
+                int lc = i < section ? C_ACTIVE_B : C_BORDER;
+                ctx.fill(lx1, dotCY - 1, lx2, dotCY + 2, lc);
+            }
+
+            // Circle fill
+            boolean active = i == section, done = i < section;
+            int cc = active ? T_GREEN : (done ? C_ACTIVE_B : C_BORDER);
+            circle(ctx, cx, dotCY, dotR, cc);
+
+            // Number inside
+            String num = String.valueOf(i + 1);
+            int nc = active ? 0xFF003018 : (done ? 0xFF003018 : C_BG);
+            ctx.drawText(textRenderer, num,
+                    cx - textRenderer.getWidth(num) / 2,
+                    dotCY - 3, nc, false);
+
+            // Section name below dot
+            String sn = SEC_NAMES[i];
+            int snX = cx - textRenderer.getWidth(sn) / 2;
+            int snC = active ? T_GREEN : (done ? T_GREY : T_DIM);
+            ctx.drawText(textRenderer, sn, snX, dotCY + dotR + 4, snC, false);
         }
+    }
+
+    private void renderLeft(DrawContext ctx, int wx, int wy) {
+        int x = wx + 12, y = wy + TOP_H + 16, maxW = LEFT_W - 22;
+
+        // Section title
+        ctx.drawText(textRenderer, SEC_NAMES[section], x, y, T_WHITE, false);
+        y += 12;
+        ctx.fill(x, y, wx + LEFT_W - 10, y + 1, C_SEP);
+        y += 6;
+
+        // Wrapped description
+        for (String line : wrapText(SEC_DESC[section], maxW)) {
+            ctx.drawText(textRenderer, line, x, y, T_GREY, false);
+            y += 10;
+        }
+    }
+
+    private void renderControlsLabels(DrawContext ctx, int rx, int cy, int rw) {
+        String[] rows = {"Forward", "Back", "Left", "Right", "Attack"};
+        for (int i = 0; i < rows.length; i++) {
+            int ry = cy + 12 + i * 26;
+            ctx.fill(rx + 4, ry, rx + rw - 4, ry + 18, C_ITEM);
+            ctx.drawText(textRenderer, rows[i], rx + 12, ry + 5, T_MAIN, false);
+        }
+        int ty = cy + 12 + rows.length * 26 + 10;
+        ctx.drawText(textRenderer, "Auto-attack:",     rx + 12, ty + 3,      T_GREY, false);
+        ctx.drawText(textRenderer, "Low sensitivity:", rx + 12, ty + 3 + 22, T_GREY, false);
+    }
+
+    private void renderBindsLabels(DrawContext ctx, int rx, int cy, int rw) {
+        List<FarmHelperConfig.CommandBind> binds = config.commandBinds;
+        if (binds.isEmpty()) {
+            ctx.drawText(textRenderer, "No binds yet.", rx + 12, cy + 16, T_DIM, false);
+        }
+        for (int i = 0; i < binds.size(); i++) {
+            FarmHelperConfig.CommandBind b = binds.get(i);
+            int ry = cy + 12 + i * 26;
+            ctx.fill(rx + 4, ry, rx + rw - 4, ry + 18, C_ITEM);
+            ctx.drawText(textRenderer, "[ " + keyName(b.key) + " ]", rx + 12, ry + 5, T_GREEN, false);
+            ctx.drawText(textRenderer, "→  /" + b.command,
+                    rx + 12 + textRenderer.getWidth("[ " + keyName(b.key) + " ]") + 4, ry + 5, T_MAIN, false);
+        }
+    }
+
+    private void renderStatusLabels(DrawContext ctx, int rx, int cy, int rw) {
+        // Binding summary below the toggle
+        int sy = cy + 56;
+        ctx.drawText(textRenderer, "Active bindings", rx + 14, sy, T_DIM, false);
+        sy += 12;
+
+        String[][] rows = {
+            {"Forward",  keyName(config.forwardKey)},
+            {"Back",     keyName(config.backKey)},
+            {"Left",     keyName(config.leftKey)},
+            {"Right",    keyName(config.rightKey)},
+            {"Attack",   keyName(config.attackKey)},
+            {"Auto-attack",   config.autoAttack        ? "ON" : "OFF"},
+            {"Low sensitivity", config.reduceSensitivity ? "ON" : "OFF"},
+        };
+        boolean fm = config.farmModeEnabled;
+        for (String[] row : rows) {
+            ctx.drawText(textRenderer, row[0] + ":", rx + 14, sy, T_DIM, false);
+            boolean isToggle = row[1].equals("ON") || row[1].equals("OFF");
+            int vc = isToggle ? (row[1].equals("ON") ? T_GREEN : T_RED)
+                              : (fm ? T_MAIN : T_DIM);
+            ctx.drawText(textRenderer, row[1], rx + 110, sy, vc, false);
+            sy += 10;
+        }
+
+        if (!config.commandBinds.isEmpty()) {
+            ctx.drawText(textRenderer, config.commandBinds.size() + " command bind(s)", rx + 14, sy + 2, T_DIM, false);
+        }
+    }
+
+    private void renderFooter(DrawContext ctx, int wx, int wy, int mx, int my) {
+        int botY = wy + WIN_H - BOT_H;
+        boolean fm = config.farmModeEnabled;
+        String statusTxt = fm ? "✓ Farm Mode active" : "○ Farm Mode off";
+        int sc = fm ? T_GREEN : T_DIM;
+        int sx = wx + (WIN_W - textRenderer.getWidth(statusTxt)) / 2;
+        ctx.drawText(textRenderer, statusTxt, sx, botY + 12, sc, false);
+    }
+
+    private void renderBtn(DrawContext ctx, Btn b, int mx, int my) {
+        boolean hov = mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+        int bg = hov ? brighten(b.bg, 22) : b.bg;
         ctx.fill(b.x, b.y, b.x + b.w, b.y + b.h, bg);
 
-        // Border (brighter on hover)
-        int bdr = hov ? 0xFF006600 : 0xFF002800;
-        ctx.fill(b.x,           b.y,           b.x + b.w,     b.y + 1,     bdr);
-        ctx.fill(b.x,           b.y + b.h - 1, b.x + b.w,     b.y + b.h,   bdr);
-        ctx.fill(b.x,           b.y,           b.x + 1,       b.y + b.h,   bdr);
-        ctx.fill(b.x + b.w - 1, b.y,           b.x + b.w,     b.y + b.h,   bdr);
+        int borderCol = b.activeBorder ? C_ACTIVE_B : C_BORDER;
+        border(ctx, b.x, b.y, b.w, b.h, borderCol);
 
-        // Top highlight strip
-        ctx.fill(b.x + 1, b.y + 1, b.x + b.w - 1, b.y + 2, 0x18FFFFFF);
+        if (hov && !b.activeBorder) {
+            ctx.fill(b.x + 1, b.y + 1, b.x + b.w - 1, b.y + 2, 0x14FFFFFF);
+        }
 
         int tx = b.x + (b.w - textRenderer.getWidth(b.label)) / 2;
         int ty = b.y + (b.h - 7) / 2;
-        ctx.drawText(textRenderer, b.label, tx, ty, b.fg, true);
-    }
-
-    private void renderDropdown(DrawContext ctx, int wx, int wy, int mx, int my) {
-        int dx   = wx + 8;
-        int dy   = wy + TOOL_Y + TOOL_H + 2;
-        int dw   = 95;
-        int dh   = 18;
-        String[] names = {"Controls", "Binds"};
-        String[] ids   = {"controls", "binds"};
-
-        // Panel shadow
-        ctx.fill(dx + 2, dy + 2, dx + dw + 2, dy + names.length * dh + 2, 0x55000000);
-        // Panel border
-        ctx.fill(dx - 1, dy - 1, dx + dw + 1, dy + names.length * dh + 1, 0xFF000000);
-
-        for (int i = 0; i < names.length; i++) {
-            int oy  = dy + i * dh;
-            boolean active = section.equals(ids[i]);
-            boolean hov    = mx >= dx && mx <= dx + dw && my >= oy && my <= oy + dh;
-            int bg = active ? 0xFF004A22 : (hov ? 0xFF003300 : 0xFF001800);
-            ctx.fill(dx, oy, dx + dw, oy + dh, bg);
-            ctx.fill(dx, oy, dx + dw, oy + 1, 0xFF002200);
-            int fg = active ? T_ON : (hov ? T_MAIN : T_LABEL);
-            if (active) ctx.drawText(textRenderer, "✓ " + names[i], dx + 5, oy + 5, fg, true);
-            else        ctx.drawText(textRenderer, "  " + names[i], dx + 5, oy + 5, fg, true);
-        }
-    }
-
-    private void renderDiamonds(DrawContext ctx, int wx, int wy, long time) {
-        double phase = time / 7000.0;
-        // Main decorative diamonds
-        int[][] shapes = {
-            {wx + 50,  wy + 155, 16},
-            {wx + 140, wy + 180, 12},
-            {wx + 230, wy + 150, 15},
-            {wx + 305, wy + 185, 10},
-            {wx + 90,  wy + 215, 9},
-            {wx + 330, wy + 115, 13},
-        };
-        for (int i = 0; i < shapes.length; i++) {
-            float p = (float)(Math.sin(phase * 2.1 + i * 0.85) * 0.5 + 0.5);
-            int cx = shapes[i][0] + (int)(Math.sin(phase + i * 1.15) * 7);
-            int cy = shapes[i][1] + (int)(Math.cos(phase * 0.8 + i)  * 5);
-            int alpha = (int)(15 + p * 28);
-            diamond(ctx, cx, cy, shapes[i][2], (alpha << 24) | 0x00BB00);
-        }
-        // Small sparkle dots
-        for (int i = 0; i < 5; i++) {
-            double sp = phase * 4.0 + i * 1.3;
-            double sv = Math.sin(sp);
-            if (sv > 0.85) {
-                int sx = wx + 30 + i * 62 + (int)(Math.cos(sp * 0.7) * 12);
-                int sy = wy + WIN_H - 40 + (int)(Math.sin(sp * 0.5) * 18);
-                int a  = (int)((sv - 0.85) / 0.15 * 110);
-                ctx.fill(sx, sy, sx + 2, sy + 2, (a << 24) | 0x0066FF00);
-            }
-        }
-    }
-
-    private void diamond(DrawContext ctx, int cx, int cy, int size, int color) {
-        for (int dy = -size; dy <= size; dy++) {
-            int hw = size - Math.abs(dy);
-            if (hw > 0) ctx.fill(cx - hw, cy + dy, cx + hw, cy + dy + 1, color);
-        }
+        ctx.drawText(textRenderer, b.label, tx, ty, hov ? brightenText(b.fg) : b.fg, false);
     }
 
     // ── Input ─────────────────────────────────────────────────────────────────
 
     @Override
     public boolean mouseClicked(Click click, boolean bl) {
-        if (dropdownOpen) {
-            int wx = wx(), wy = wy();
-            int dx = wx + 8;
-            int dy = wy + TOOL_Y + TOOL_H + 2;
-            int dw = 95, dh = 18;
-            String[] ids = {"controls", "binds"};
+        // Progress dot click (expanded hit area)
+        int wx = wx(), wy = wy();
+        int n = SEC_NAMES.length, dotR = 4, gap = 38;
+        int totalW = n * (dotR * 2) + (n - 1) * gap;
+        int dx0 = wx + (WIN_W - totalW) / 2;
+        int dotCY = wy + TOP_H / 2 - 2;
 
-            for (int i = 0; i < ids.length; i++) {
-                int oy = dy + i * dh;
-                if (click.x() >= dx && click.x() <= dx + dw && click.y() >= oy && click.y() <= oy + dh) {
-                    if (!section.equals(ids[i])) {
-                        section = ids[i];
-                        capturingFor = null;
-                        addingBind = capturingNewBindKey = false;
-                        newBindKey = 0; pendingCommandText = "";
-                    }
-                    dropdownOpen = false;
-                    sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.0f);
-                    clearAndInit();
-                    return true;
+        for (int i = 0; i < n; i++) {
+            int cx = dx0 + i * (dotR * 2 + gap) + dotR;
+            if (Math.abs(click.x() - cx) <= 10 && Math.abs(click.y() - dotCY) <= 10) {
+                if (i != section) {
+                    navigateTo(i);
+                    sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.8f);
                 }
+                return true;
             }
-            dropdownOpen = false;
-            clearAndInit();
-            return true;
         }
 
-        for (Btn b : buttons) {
+        // Custom buttons
+        for (Btn b : btns) {
             if (click.x() >= b.x && click.x() <= b.x + b.w &&
                 click.y() >= b.y && click.y() <= b.y + b.h) {
                 b.action().run();
@@ -455,21 +448,88 @@ public class FarmHelperScreen extends Screen {
         }
 
         if (k == GLFW.GLFW_KEY_ESCAPE) { close(); return true; }
-
         return super.keyPressed(input);
     }
 
     @Override
     public boolean shouldPause() { return false; }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Navigation ────────────────────────────────────────────────────────────
+
+    private void goNext() {
+        if (section < SEC_NAMES.length - 1) {
+            navigateTo(section + 1);
+            sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.1f);
+        } else {
+            sound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.5f);
+            close();
+        }
+    }
+
+    private void goBack() {
+        if (section > 0) {
+            navigateTo(section - 1);
+            sound(SoundEvents.ITEM_BOOK_PAGE_TURN, 0.9f);
+        }
+    }
+
+    private void navigateTo(int idx) {
+        section = idx;
+        capturingFor = null;
+        addingBind = capturingNewBindKey = false;
+        newBindKey = 0;
+        pendingCmd = "";
+        clearAndInit();
+    }
+
+    // ── Drawing utilities ─────────────────────────────────────────────────────
+
+    private void border(DrawContext ctx, int x, int y, int w, int h, int c) {
+        ctx.fill(x,       y,       x + w,   y + 1,   c);
+        ctx.fill(x,       y+h-1,   x + w,   y + h,   c);
+        ctx.fill(x,       y,       x + 1,   y + h,   c);
+        ctx.fill(x+w-1,   y,       x + w,   y + h,   c);
+    }
+
+    private void circle(DrawContext ctx, int cx, int cy, int r, int color) {
+        for (int dy = -r; dy <= r; dy++) {
+            int dx = (int) Math.sqrt((double) r * r - (double) dy * dy);
+            ctx.fill(cx - dx, cy + dy, cx + dx + 1, cy + dy + 1, color);
+        }
+    }
+
+    private static int brighten(int argb, int amt) {
+        int r = Math.min(255, ((argb >> 16) & 0xFF) + amt);
+        int g = Math.min(255, ((argb >> 8)  & 0xFF) + amt);
+        int b = Math.min(255, (argb & 0xFF)          + amt);
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
+    private static int brightenText(int c) {
+        if (c == T_GREY) return T_MAIN;
+        if (c == T_DIM)  return T_GREY;
+        return c;
+    }
+
+    private List<String> wrapText(String text, int maxW) {
+        List<String> lines = new ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (String word : text.split(" ")) {
+            String test = line.isEmpty() ? word : line + " " + word;
+            if (textRenderer.getWidth(test) > maxW) {
+                if (!line.isEmpty()) { lines.add(line.toString()); line = new StringBuilder(); }
+                line.append(word);
+            } else {
+                if (!line.isEmpty()) line.append(" ");
+                line.append(word);
+            }
+        }
+        if (!line.isEmpty()) lines.add(line.toString());
+        return lines;
+    }
 
     private void sound(net.minecraft.sound.SoundEvent se, float pitch) {
         if (client != null) client.getSoundManager().play(PositionedSoundInstance.ui(se, pitch));
-    }
-
-    private static int argb(int baseAlpha, float multiplier) {
-        return ((int)(baseAlpha * multiplier) << 24);
     }
 
     static String keyName(int key) {
