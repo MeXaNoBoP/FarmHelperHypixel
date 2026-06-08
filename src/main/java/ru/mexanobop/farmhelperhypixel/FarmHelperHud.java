@@ -6,7 +6,8 @@ import net.minecraft.client.resource.language.I18n;
 
 public class FarmHelperHud {
 
-    static final int W  = 130;
+    static final int W   = 130;
+    static final int MAX_H = 82; // max possible height (5 lines)
     private static final int BG = 0xCC000000;   // semi-transparent black
     private static final int BD = 0xFF1D6247;   // green border
     private static final int T_GREEN  = 0xFF5BE38B;

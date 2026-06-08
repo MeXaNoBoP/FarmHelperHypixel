@@ -285,8 +285,28 @@ public class FarmHelperScreen extends Screen {
     // ── Render ────────────────────────────────────────────────────────────────
 
     @Override
+    public void renderBackground(DrawContext ctx, int mouseX, int mouseY, float delta) {
+        // Dark dim instead of blur — keeps HUD crisp for repositioning
+        ctx.fill(0, 0, width, height, 0xBB000000);
+    }
+
+    @Override
     public void render(DrawContext ctx, int mx, int my, float delta) {
         int wx = windowX, wy = windowY;
+
+        // HUD: render on top of the dim overlay so it's fully visible for repositioning
+        if (config.hudEnabled) {
+            FarmHelperHud.render(ctx, config, client);
+            if (section == 3) {
+                // Bright outline to signal the HUD is draggable from here
+                int hx = config.hudX, hy = config.hudY;
+                int hw = FarmHelperHud.W, hh = FarmHelperHud.MAX_H;
+                ctx.fill(hx - 1, hy - 1, hx + hw + 1, hy,     0xFF5BE38B);
+                ctx.fill(hx - 1, hy + hh, hx + hw + 1, hy + hh + 1, 0xFF5BE38B);
+                ctx.fill(hx - 1, hy - 1, hx,     hy + hh + 1, 0xFF5BE38B);
+                ctx.fill(hx + hw, hy - 1, hx + hw + 1, hy + hh + 1, 0xFF5BE38B);
+            }
+        }
 
         // Window panels
         ctx.fill(wx, wy, wx + WIN_W, wy + WIN_H, C_BG);
@@ -411,7 +431,8 @@ public class FarmHelperScreen extends Screen {
     }
 
     private void renderFarmModeLabels(DrawContext ctx, int rpx, int cy, int rpw) {
-        int sy = cy + 58;
+        // Start below HUD buttons (toggle at cy+58 h16, drag hint at cy+82 h16)
+        int sy = cy + (config.hudEnabled ? 108 : 84);
         ctx.drawText(textRenderer, t("farmhelperhypixel.status.bindings"), rpx + 14, sy, T_DIM, false);
         sy += 12;
         boolean fm = config.farmModeEnabled;
