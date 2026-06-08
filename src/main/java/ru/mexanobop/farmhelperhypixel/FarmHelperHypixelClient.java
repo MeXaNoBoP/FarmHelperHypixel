@@ -7,7 +7,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.EntityHitResult;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashMap;
@@ -70,12 +69,8 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
             return;
         }
 
-        // Auto-attack: only hold attack when targeting an entity, not a block
-        if (config.autoAttack && client.crosshairTarget instanceof EntityHitResult) {
-            holdAttack(client);
-        } else {
-            releaseAttack(client);
-        }
+        if (config.autoAttack) holdAttack(client);
+        else releaseAttack(client);
 
         long handle = client.getWindow().getHandle();
 
