@@ -64,13 +64,9 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
         }
 
         if (!config.farmModeEnabled || client.currentScreen != null) {
-            releaseAttack(client);
             pressedLastTick.clear();
             return;
         }
-
-        if (config.autoAttack) holdAttack(client);
-        else releaseAttack(client);
 
         long handle = client.getWindow().getHandle();
 
@@ -153,7 +149,6 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
     private static void removeBinds(MinecraftClient client) {
         if (client.options == null) return;
 
-        releaseAttack(client);
         releaseInversions();
 
         if (savedState != null) {
@@ -197,19 +192,6 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
         invState.clear();
         invPrev1.clear();
         invPrev2.clear();
-    }
-
-    private static void holdAttack(MinecraftClient client) {
-        InputUtil.Key key = getBoundKey(client.options.attackKey);
-        client.options.attackKey.setPressed(true);
-        KeyBinding.setKeyPressed(key, true);
-    }
-
-    private static void releaseAttack(MinecraftClient client) {
-        if (client.options == null) return;
-        InputUtil.Key key = getBoundKey(client.options.attackKey);
-        client.options.attackKey.setPressed(false);
-        KeyBinding.setKeyPressed(key, false);
     }
 
     private static void sendCommand(MinecraftClient client, String command) {

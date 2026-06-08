@@ -150,15 +150,8 @@ public class FarmHelperScreen extends Screen {
         }
 
         int ty = cy + 12 + 5 * 26 + 10;
-        boolean aa = config.autoAttack;
-        btn(rpx + rpw - 56, ty, 50, 14, aa ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off"),
-                aa ? C_ACTIVE : C_ITEM, aa ? T_GREEN : T_RED, aa,
-                () -> { config.autoAttack = !config.autoAttack; config.save();
-                        sound(config.autoAttack ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
-                              config.autoAttack ? 1.6f : 0.8f); clearAndInit(); });
-
         boolean rs = config.reduceSensitivity;
-        btn(rpx + rpw - 56, ty + 22, 50, 14, rs ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off"),
+        btn(rpx + rpw - 56, ty, 50, 14, rs ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off"),
                 rs ? C_ACTIVE : C_ITEM, rs ? T_GREEN : T_RED, rs,
                 () -> { config.reduceSensitivity = !config.reduceSensitivity; config.save();
                         sound(config.reduceSensitivity ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
@@ -360,8 +353,7 @@ public class FarmHelperScreen extends Screen {
             ctx.drawText(textRenderer, t(rowKeys[i]), rpx + 12, ry + 5, T_MAIN, false);
         }
         int ty = cy + 12 + 5 * 26 + 10;
-        ctx.drawText(textRenderer, t("farmhelperhypixel.key.autoattack"), rpx + 12, ty + 3, T_GREY, false);
-        ctx.drawText(textRenderer, t("farmhelperhypixel.key.lowsens"),    rpx + 12, ty + 3 + 22, T_GREY, false);
+        ctx.drawText(textRenderer, t("farmhelperhypixel.key.lowsens"), rpx + 12, ty + 3, T_GREY, false);
     }
 
     private void renderBindsLabels(DrawContext ctx, int rpx, int cy, int rpw) {
@@ -411,8 +403,7 @@ public class FarmHelperScreen extends Screen {
             {t("farmhelperhypixel.key.left"),    keyName(config.leftKey)},
             {t("farmhelperhypixel.key.right"),   keyName(config.rightKey)},
             {t("farmhelperhypixel.key.attack"),  keyName(config.attackKey)},
-            {t("farmhelperhypixel.key.autoattack"), config.autoAttack        ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off")},
-            {t("farmhelperhypixel.key.lowsens"),    config.reduceSensitivity ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off")},
+            {t("farmhelperhypixel.key.lowsens"), config.reduceSensitivity ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off")},
         };
         for (String[] row : rows) {
             ctx.drawText(textRenderer, row[0], rpx + 14, sy, T_DIM, false);

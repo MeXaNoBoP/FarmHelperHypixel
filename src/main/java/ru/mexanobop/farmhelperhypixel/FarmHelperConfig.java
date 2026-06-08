@@ -19,7 +19,6 @@ public class FarmHelperConfig {
     public int leftKey = GLFW.GLFW_KEY_LEFT;
     public int rightKey = GLFW.GLFW_KEY_RIGHT;
     public int attackKey = GLFW.GLFW_KEY_PAGE_DOWN;
-    public boolean autoAttack = false;
     public boolean reduceSensitivity = true;
     public boolean farmModeEnabled = false;
     public List<CommandBind>   commandBinds   = new ArrayList<>();
