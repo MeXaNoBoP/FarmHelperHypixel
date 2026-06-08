@@ -3,6 +3,7 @@ package ru.mexanobop.farmhelperhypixel;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
@@ -43,6 +44,8 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(FarmHelperHypixelClient::onTick);
+        HudRenderCallback.EVENT.register((ctx, tickDelta) ->
+                FarmHelperHud.render(ctx, config, MinecraftClient.getInstance()));
     }
 
     private static void onTick(MinecraftClient client) {
@@ -123,6 +126,7 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
 
     private static void applyBinds(MinecraftClient client) {
         if (client.options == null) return;
+        FarmHelperHud.farmStartTime = System.currentTimeMillis();
 
         savedState = new SavedState(
                 getBoundKey(client.options.forwardKey),
@@ -148,6 +152,7 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
 
     private static void removeBinds(MinecraftClient client) {
         if (client.options == null) return;
+        FarmHelperHud.farmStartTime = 0;
 
         releaseInversions();
 

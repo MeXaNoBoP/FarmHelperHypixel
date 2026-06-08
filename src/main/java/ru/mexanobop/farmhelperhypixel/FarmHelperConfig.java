@@ -21,6 +21,9 @@ public class FarmHelperConfig {
     public int attackKey = GLFW.GLFW_KEY_PAGE_DOWN;
     public boolean reduceSensitivity = true;
     public boolean farmModeEnabled = false;
+    public boolean hudEnabled = true;
+    public int hudX = 4;
+    public int hudY = 4;
     public List<CommandBind>   commandBinds   = new ArrayList<>();
     public List<InversionBind> inversionBinds = new ArrayList<>();
 

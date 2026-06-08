@@ -89,6 +89,10 @@ public class FarmHelperScreen extends Screen {
     private record Btn(int rx, int ry, int w, int h, String label, int bg, int fg, boolean ab, Runnable action) {}
     private final List<Btn> btns = new ArrayList<>();
 
+    // HUD drag state
+    private boolean draggingHud = false;
+    private int     hudDragOffX, hudDragOffY;
+
     public FarmHelperScreen(FarmHelperConfig config) {
         super(Text.literal("FarmHelperHypixel"));
         this.config = config;
@@ -258,6 +262,20 @@ public class FarmHelperScreen extends Screen {
                 () -> { config.farmModeEnabled = !config.farmModeEnabled; config.save();
                         sound(config.farmModeEnabled ? SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
                               config.farmModeEnabled ? 1.6f : 0.8f); clearAndInit(); });
+
+        // HUD toggle
+        boolean hud = config.hudEnabled;
+        btn(rpx + 10, cy + 58, rpw - 20, 16,
+                t("farmhelperhypixel.hud.toggle") + ": " + (hud ? t("farmhelperhypixel.btn.on") : t("farmhelperhypixel.btn.off")),
+                hud ? C_ACTIVE : C_ITEM, hud ? T_GREEN : T_GREY, hud,
+                () -> { config.hudEnabled = !config.hudEnabled; config.save();
+                        sound(SoundEvents.BLOCK_LEVER_CLICK, 0.8f); clearAndInit(); });
+
+        // HUD drag hint
+        if (hud) {
+            btn(rpx + 10, cy + 82, rpw - 20, 16, t("farmhelperhypixel.hud.drag_hint"),
+                    C_ITEM, T_DIM, false, () -> {});
+        }
     }
 
     private void btn(int rx, int ry, int w, int h, String label, int bg, int fg, boolean ab, Runnable action) {
@@ -476,6 +494,17 @@ public class FarmHelperScreen extends Screen {
             return true;
         }
 
+        // HUD drag — click on HUD widget to reposition it
+        if (config.hudEnabled) {
+            int hx = config.hudX, hy = config.hudY;
+            if (mx >= hx && mx <= hx + FarmHelperHud.W && my >= hy && my <= hy + 80) {
+                draggingHud = true;
+                hudDragOffX = mx - hx;
+                hudDragOffY = my - hy;
+                return true;
+            }
+        }
+
         // Consume clicks inside window to prevent game interaction
         if (mx >= windowX && mx <= windowX + WIN_W && my >= windowY && my <= windowY + WIN_H)
             return true;
@@ -485,9 +514,18 @@ public class FarmHelperScreen extends Screen {
 
     @Override
     public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+        int mx = (int) click.x(), my = (int) click.y();
+
+        if (draggingHud && click.button() == 0) {
+            config.hudX = Math.max(0, Math.min(width  - FarmHelperHud.W, mx - hudDragOffX));
+            config.hudY = Math.max(0, Math.min(height - 80,              my - hudDragOffY));
+            // Save on release, not every pixel
+            return true;
+        }
+
         if (dragging && click.button() == 0) {
-            windowX = Math.max(0, Math.min(width  - WIN_W, (int) click.x() - dragOffX));
-            windowY = Math.max(0, Math.min(height - WIN_H, (int) click.y() - dragOffY));
+            windowX = Math.max(0, Math.min(width  - WIN_W, mx - dragOffX));
+            windowY = Math.max(0, Math.min(height - WIN_H, my - dragOffY));
             if (cmdField != null) {
                 int rpx = LEFT_W + 1;
                 int bindCount = config.commandBinds.size();
@@ -501,6 +539,11 @@ public class FarmHelperScreen extends Screen {
 
     @Override
     public boolean mouseReleased(Click click) {
+        if (draggingHud) {
+            draggingHud = false;
+            config.save();
+            return true;
+        }
         if (dragging) {
             dragging = false;
             clearAndInit();

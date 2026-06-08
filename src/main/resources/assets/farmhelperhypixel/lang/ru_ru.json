@@ -41,5 +41,16 @@
   "farmhelperhypixel.farmmode.off": "✗   Режим фарма ВЫКЛЮЧЕН",
 
   "farmhelperhypixel.empty.binds": "Привязок нет.",
-  "farmhelperhypixel.empty.inversions": "Инверсий нет."
+  "farmhelperhypixel.empty.inversions": "Инверсий нет.",
+
+  "farmhelperhypixel.hud.toggle": "HUD-оверлей",
+  "farmhelperhypixel.hud.drag_hint": "Перетащите HUD чтобы переместить",
+  "farmhelperhypixel.hud.status.on": "Фарм: ВКЛЮЧЁН",
+  "farmhelperhypixel.hud.status.off": "Фарм: ВЫКЛЮЧЕН",
+  "farmhelperhypixel.hud.time": "Время:",
+  "farmhelperhypixel.hud.sens.low": "Чувств.: Низкая",
+  "farmhelperhypixel.hud.sens.normal": "Чувств.: Норма",
+  "farmhelperhypixel.hud.nobinds": "Команд нет",
+  "farmhelperhypixel.hud.binds": "команд",
+  "farmhelperhypixel.hud.inversions": "инверсий"
 }

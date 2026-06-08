@@ -41,5 +41,16 @@
   "farmhelperhypixel.farmmode.off": "✗   Farm Mode is OFF",
 
   "farmhelperhypixel.empty.binds": "No binds yet.",
-  "farmhelperhypixel.empty.inversions": "No inversions yet."
+  "farmhelperhypixel.empty.inversions": "No inversions yet.",
+
+  "farmhelperhypixel.hud.toggle": "HUD overlay",
+  "farmhelperhypixel.hud.drag_hint": "Drag the HUD to reposition it",
+  "farmhelperhypixel.hud.status.on": "Farm Mode: ON",
+  "farmhelperhypixel.hud.status.off": "Farm Mode: OFF",
+  "farmhelperhypixel.hud.time": "Time:",
+  "farmhelperhypixel.hud.sens.low": "Sensitivity: Low",
+  "farmhelperhypixel.hud.sens.normal": "Sensitivity: Normal",
+  "farmhelperhypixel.hud.nobinds": "No command binds",
+  "farmhelperhypixel.hud.binds": "bind(s)",
+  "farmhelperhypixel.hud.inversions": "inversion(s)"
 }
