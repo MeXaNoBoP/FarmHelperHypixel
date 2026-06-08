@@ -20,6 +20,7 @@
   "farmhelperhypixel.key.right": "Вправо",
   "farmhelperhypixel.key.attack": "Атака",
   "farmhelperhypixel.key.lowsens": "Низкая чувств.:",
+  "farmhelperhypixel.key.farmtoggle": "Запуск фарма:",
 
   "farmhelperhypixel.btn.back": "← Назад",
   "farmhelperhypixel.btn.next": "Далее →",
@@ -59,6 +60,10 @@
   "farmhelperhypixel.crop.sunflower": "SunFlower",
 
   "farmhelperhypixel.crops.resetall": "Сбросить всё",
+
+  "farmhelperhypixel.hud.crop.session": "Сессия",
+  "farmhelperhypixel.hud.crop.total": "Всего",
+  "farmhelperhypixel.hud.crop.none": "— нет данных —",
 
   "farmhelperhypixel.hud.toggle": "HUD-оверлей",
   "farmhelperhypixel.hud.drag_hint": "Перетащите HUD чтобы переместить",

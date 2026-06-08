@@ -23,6 +23,7 @@ public class FarmHelperConfig {
     public int attackKey = GLFW.GLFW_KEY_PAGE_DOWN;
     public boolean reduceSensitivity = true;
     public boolean farmModeEnabled = false;
+    public int farmToggleKey = GLFW.GLFW_KEY_PAGE_UP;
     public boolean hudEnabled = true;
     public int hudX = 4;
     public int hudY = 4;
@@ -62,6 +63,10 @@ public class FarmHelperConfig {
         public long lastBreakTime = 0; // epoch ms of last break, 0 = never
         public long activeMs      = 0; // accumulated active farming ms
         public int  count         = 0;
+        // Session data — transient (not saved, reset when farm mode toggles on)
+        public transient long sessionLastBreakTime = 0;
+        public transient long sessionActiveMs      = 0;
+        public transient int  sessionCount         = 0;
     }
 
     public Map<String, CropStats> cropStats = new LinkedHashMap<>();

@@ -180,6 +180,13 @@ public class FarmHelperScreen extends Screen {
                 () -> { config.reduceSensitivity = !config.reduceSensitivity; config.save();
                         sound(config.reduceSensitivity ? SoundEvents.ENTITY_ITEM_PICKUP : SoundEvents.BLOCK_LEVER_CLICK,
                               config.reduceSensitivity ? 1.6f : 0.8f); clearAndInit(); });
+
+        // Farm mode toggle key
+        boolean capT = "toggle".equals(capturingFor);
+        String tlbl = capT ? t("farmhelperhypixel.btn.presskey") : keyName(config.farmToggleKey);
+        btn(rpx + rpw - 102, ty + 22, 96, 16, tlbl,
+                capT ? C_ACTIVE : C_ITEM, capT ? T_GREEN : T_MAIN, capT,
+                () -> { capturingFor = "toggle"; sound(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, 1.3f); clearAndInit(); });
     }
 
     private void buildBindBtns(int rpx, int cy, int rpw) {
@@ -427,6 +434,11 @@ public class FarmHelperScreen extends Screen {
         }
         int ty = cy + 12 + 5 * 26 + 10;
         ctx.drawText(textRenderer, t("farmhelperhypixel.key.lowsens"), rpx + 12, ty + 3, T_GREY, false);
+
+        // Farm toggle key row
+        int fy = ty + 22;
+        ctx.fill(rpx + 4, fy, rpx + rpw - 4, fy + 18, C_ITEM);
+        ctx.drawText(textRenderer, t("farmhelperhypixel.key.farmtoggle"), rpx + 12, fy + 5, T_MAIN, false);
     }
 
     private void renderBindsLabels(DrawContext ctx, int rpx, int cy, int rpw) {
@@ -669,11 +681,12 @@ public class FarmHelperScreen extends Screen {
         if (capturingFor != null) {
             if (k != GLFW.GLFW_KEY_ESCAPE) {
                 switch (capturingFor) {
-                    case "forward" -> config.forwardKey = k;
-                    case "back"    -> config.backKey    = k;
-                    case "left"    -> config.leftKey    = k;
-                    case "right"   -> config.rightKey   = k;
-                    case "attack"  -> config.attackKey  = k;
+                    case "forward" -> config.forwardKey    = k;
+                    case "back"    -> config.backKey      = k;
+                    case "left"    -> config.leftKey      = k;
+                    case "right"   -> config.rightKey     = k;
+                    case "attack"  -> config.attackKey    = k;
+                    case "toggle"  -> config.farmToggleKey = k;
                 }
                 config.save();
                 sound(SoundEvents.ENTITY_ITEM_PICKUP, 1.9f);

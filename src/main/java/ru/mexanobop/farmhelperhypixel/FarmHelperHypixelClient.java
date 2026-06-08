@@ -30,6 +30,7 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
     private static boolean settingsApplied = false;
     private static SavedState savedState = null;
     private static final Set<Integer> pressedLastTick = new HashSet<>();
+    private static boolean farmTogglePressedLast = false;
 
     // Inversion state: index → 0=none, 1=key1 held, 2=key2 held
     private static final Map<Integer, Integer> invState = new HashMap<>();
@@ -39,6 +40,7 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
     // Crop tracking — crosshair-based, works on multiplayer
     private static BlockPos trackedCropPos   = null;
     private static Block    trackedCropBlock = null;
+    static String activeCropKey = null; // key of most recently broken crop (farm mode only)
 
     @Override
     public void onInitializeClient() {
@@ -64,6 +66,18 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
         }
 
         tickCropTracking(client);
+
+        // Farm mode toggle key (edge-detect, works even outside farm mode)
+        if (client.currentScreen == null && config.farmToggleKey != 0) {
+            boolean togPressed = GLFW.glfwGetKey(client.getWindow().getHandle(), config.farmToggleKey) == GLFW.GLFW_PRESS;
+            if (togPressed && !farmTogglePressedLast) {
+                config.farmModeEnabled = !config.farmModeEnabled;
+                config.save();
+            }
+            farmTogglePressedLast = togPressed;
+        } else {
+            farmTogglePressedLast = false;
+        }
 
         if (client.player == null) {
             if (settingsApplied) removeBinds(client);
@@ -166,6 +180,14 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
 
         releaseInversions();
 
+        // Reset session stats
+        for (FarmHelperConfig.CropStats cs : config.cropStats.values()) {
+            cs.sessionLastBreakTime = 0;
+            cs.sessionActiveMs      = 0;
+            cs.sessionCount         = 0;
+        }
+        activeCropKey = null;
+
         if (savedState != null) {
             bindKey(client.options.forwardKey, savedState.forwardKey());
             bindKey(client.options.leftKey,    savedState.leftKey());
@@ -255,17 +277,29 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
         if (key == null) return;
         FarmHelperConfig.CropStats stats = config.cropStats.computeIfAbsent(key, k -> new FarmHelperConfig.CropStats());
         long now = System.currentTimeMillis();
+        // Permanent stats (always tracked)
         if (stats.lastBreakTime == 0) {
-            // First break ever — start counting from zero
             stats.lastBreakTime = now;
             stats.activeMs = 0;
         } else {
             long gap = now - stats.lastBreakTime;
-            if (gap <= 5000) stats.activeMs += gap; // active gap → add it
-            // gap > 5s → pause was discarded, don't add idle time
+            if (gap <= 5000) stats.activeMs += gap;
             stats.lastBreakTime = now;
         }
         stats.count++;
+        // Session stats (only while farm mode is on)
+        if (config.farmModeEnabled) {
+            if (stats.sessionLastBreakTime == 0) {
+                stats.sessionLastBreakTime = now;
+                stats.sessionActiveMs = 0;
+            } else {
+                long sgap = now - stats.sessionLastBreakTime;
+                if (sgap <= 5000) stats.sessionActiveMs += sgap;
+                stats.sessionLastBreakTime = now;
+            }
+            stats.sessionCount++;
+            activeCropKey = key;
+        }
         config.save();
     }
 
