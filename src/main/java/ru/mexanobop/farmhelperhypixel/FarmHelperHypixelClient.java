@@ -6,81 +6,83 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
-import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public final class FarmHelperHypixelClient implements ClientModInitializer {
     private static final String MOD_ID = "farmhelperhypixel";
-    private static final KeyBinding.Category CATEGORY = KeyBinding.Category.create(Identifier.of(MOD_ID, "main"));
+    private static final KeyBinding.Category CATEGORY =
+            KeyBinding.Category.create(Identifier.of(MOD_ID, "main"));
 
-    private static KeyBinding toggleFarmKey;
-    private static KeyBinding homeKey;
-    private static boolean farmModeEnabled;
-    private static boolean attackToggled;
-    private static SavedState savedState;
+    private static KeyBinding openMenuKey;
+    private static FarmHelperConfig config;
+
+    private static boolean settingsApplied = false;
+    private static SavedState savedState = null;
+    private static final Set<Integer> pressedLastTick = new HashSet<>();
 
     @Override
     public void onInitializeClient() {
-        toggleFarmKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key." + MOD_ID + ".toggle",
+        config = FarmHelperConfig.load();
+
+        openMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key." + MOD_ID + ".open_menu",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_F8,
                 CATEGORY
         ));
-        homeKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key." + MOD_ID + ".home",
-                InputUtil.Type.KEYSYM,
-                InputUtil.UNKNOWN_KEY.getCode(),
-                CATEGORY
-        ));
 
-        ClientTickEvents.START_CLIENT_TICK.register(FarmHelperHypixelClient::onClientTickStart);
-        ClientTickEvents.END_CLIENT_TICK.register(FarmHelperHypixelClient::onClientTickEnd);
+        ClientTickEvents.END_CLIENT_TICK.register(FarmHelperHypixelClient::onTick);
     }
 
-    private static void onClientTickStart(MinecraftClient client) {
-        if (farmModeEnabled && client.player != null) {
-            applyAttackHold(client);
-        }
-    }
-
-    private static void onClientTickEnd(MinecraftClient client) {
-        while (toggleFarmKey.wasPressed()) {
-            if (farmModeEnabled) {
-                disableFarmMode(client);
-            } else {
-                enableFarmMode(client);
+    private static void onTick(MinecraftClient client) {
+        while (openMenuKey.wasPressed()) {
+            if (client.currentScreen == null) {
+                client.setScreen(new FarmHelperScreen(config));
             }
         }
 
-        if (!farmModeEnabled) {
-            return;
-        }
-
         if (client.player == null) {
-            disableFarmMode(client);
+            if (settingsApplied) removeBinds(client);
             return;
         }
 
-        while (homeKey.wasPressed()) {
-            sendHomeCommand(client);
+        if (config.farmModeEnabled && !settingsApplied) {
+            applyBinds(client);
+        } else if (!config.farmModeEnabled && settingsApplied) {
+            removeBinds(client);
         }
 
-        while (client.options.attackKey.wasPressed()) {
-            attackToggled = !attackToggled;
-            showActionBar(client, attackToggled
-                    ? "message." + MOD_ID + ".attack_on"
-                    : "message." + MOD_ID + ".attack_off");
+        if (!config.farmModeEnabled || client.currentScreen != null) {
+            releaseAttack(client);
+            pressedLastTick.clear();
+            return;
         }
 
-        applyAttackHold(client);
+        // Auto-attack hold
+        if (config.autoAttack) {
+            holdAttack(client);
+        } else {
+            releaseAttack(client);
+        }
+
+        // Command binds (edge detection: fire once per press)
+        long handle = client.getWindow().getHandle();
+        for (FarmHelperConfig.CommandBind bind : config.commandBinds) {
+            boolean pressed = GLFW.glfwGetKey(handle, bind.key) == GLFW.GLFW_PRESS;
+            if (pressed && !pressedLastTick.contains(bind.key)) {
+                sendCommand(client, bind.command);
+            }
+            if (pressed) pressedLastTick.add(bind.key);
+            else pressedLastTick.remove(bind.key);
+        }
     }
 
-    private static void enableFarmMode(MinecraftClient client) {
-        if (client.options == null || farmModeEnabled) {
-            return;
-        }
+    private static void applyBinds(MinecraftClient client) {
+        if (client.options == null) return;
 
         savedState = new SavedState(
                 getBoundKey(client.options.forwardKey),
@@ -88,83 +90,74 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
                 getBoundKey(client.options.backKey),
                 getBoundKey(client.options.rightKey),
                 getBoundKey(client.options.attackKey),
-                getBoundKey(homeKey),
                 client.options.getMouseSensitivity().getValue()
         );
 
-        client.options.getMouseSensitivity().setValue(0.0);
-        bindKey(client.options.forwardKey, GLFW.GLFW_KEY_UP);
-        bindKey(client.options.leftKey, GLFW.GLFW_KEY_LEFT);
-        bindKey(client.options.backKey, GLFW.GLFW_KEY_DOWN);
-        bindKey(client.options.rightKey, GLFW.GLFW_KEY_RIGHT);
-        bindKey(client.options.attackKey, GLFW.GLFW_KEY_PAGE_DOWN);
-        bindKey(homeKey, GLFW.GLFW_KEY_END);
+        bindKey(client.options.forwardKey, config.forwardKey);
+        bindKey(client.options.leftKey,    config.leftKey);
+        bindKey(client.options.backKey,    config.backKey);
+        bindKey(client.options.rightKey,   config.rightKey);
+        bindKey(client.options.attackKey,  config.attackKey);
 
-        attackToggled = false;
-        farmModeEnabled = true;
-        KeyBinding.updateKeysByCode();
-        client.options.write();
-        showActionBar(client, "message." + MOD_ID + ".enabled");
-    }
-
-    private static void disableFarmMode(MinecraftClient client) {
-        if (client.options == null || !farmModeEnabled) {
-            return;
+        if (config.reduceSensitivity) {
+            client.options.getMouseSensitivity().setValue(0.0);
         }
 
-        farmModeEnabled = false;
-        attackToggled = false;
-        setAttackHeld(client, false);
+        settingsApplied = true;
+        KeyBinding.updateKeysByCode();
+        client.options.write();
+    }
+
+    private static void removeBinds(MinecraftClient client) {
+        if (client.options == null) return;
+
+        releaseAttack(client);
 
         if (savedState != null) {
-            client.options.getMouseSensitivity().setValue(savedState.mouseSensitivity());
             bindKey(client.options.forwardKey, savedState.forwardKey());
-            bindKey(client.options.leftKey, savedState.leftKey());
-            bindKey(client.options.backKey, savedState.backKey());
-            bindKey(client.options.rightKey, savedState.rightKey());
-            bindKey(client.options.attackKey, savedState.attackKey());
-            bindKey(homeKey, savedState.homeKey());
+            bindKey(client.options.leftKey,    savedState.leftKey());
+            bindKey(client.options.backKey,    savedState.backKey());
+            bindKey(client.options.rightKey,   savedState.rightKey());
+            bindKey(client.options.attackKey,  savedState.attackKey());
+            client.options.getMouseSensitivity().setValue(savedState.mouseSensitivity());
             savedState = null;
         }
 
-        setAttackHeld(client, false);
+        settingsApplied = false;
+        pressedLastTick.clear();
         KeyBinding.updateKeysByCode();
         client.options.write();
-        showActionBar(client, "message." + MOD_ID + ".disabled");
     }
 
-    private static void bindKey(KeyBinding keyBinding, int glfwKeyCode) {
-        bindKey(keyBinding, InputUtil.Type.KEYSYM.createFromCode(glfwKeyCode));
+    private static void holdAttack(MinecraftClient client) {
+        InputUtil.Key key = getBoundKey(client.options.attackKey);
+        client.options.attackKey.setPressed(true);
+        KeyBinding.setKeyPressed(key, true);
     }
 
-    private static void bindKey(KeyBinding keyBinding, InputUtil.Key key) {
-        keyBinding.setBoundKey(key);
+    private static void releaseAttack(MinecraftClient client) {
+        if (client.options == null) return;
+        InputUtil.Key key = getBoundKey(client.options.attackKey);
+        client.options.attackKey.setPressed(false);
+        KeyBinding.setKeyPressed(key, false);
     }
 
-    private static InputUtil.Key getBoundKey(KeyBinding keyBinding) {
-        return InputUtil.fromTranslationKey(keyBinding.getBoundKeyTranslationKey());
-    }
-
-    private static void applyAttackHold(MinecraftClient client) {
-        setAttackHeld(client, client.currentScreen == null && attackToggled);
-    }
-
-    private static void setAttackHeld(MinecraftClient client, boolean held) {
-        InputUtil.Key attackKey = getBoundKey(client.options.attackKey);
-        client.options.attackKey.setPressed(held);
-        KeyBinding.setKeyPressed(attackKey, held);
-    }
-
-    private static void sendHomeCommand(MinecraftClient client) {
+    private static void sendCommand(MinecraftClient client, String command) {
         if (client.getNetworkHandler() != null) {
-            client.getNetworkHandler().sendChatCommand("home");
+            client.getNetworkHandler().sendChatCommand(command);
         }
     }
 
-    private static void showActionBar(MinecraftClient client, String translationKey) {
-        if (client.player != null) {
-            client.player.sendMessage(Text.translatable(translationKey), true);
-        }
+    private static void bindKey(KeyBinding binding, int glfwKey) {
+        binding.setBoundKey(InputUtil.Type.KEYSYM.createFromCode(glfwKey));
+    }
+
+    private static void bindKey(KeyBinding binding, InputUtil.Key key) {
+        binding.setBoundKey(key);
+    }
+
+    private static InputUtil.Key getBoundKey(KeyBinding binding) {
+        return InputUtil.fromTranslationKey(binding.getBoundKeyTranslationKey());
     }
 
     private record SavedState(
@@ -173,8 +166,6 @@ public final class FarmHelperHypixelClient implements ClientModInitializer {
             InputUtil.Key backKey,
             InputUtil.Key rightKey,
             InputUtil.Key attackKey,
-            InputUtil.Key homeKey,
             double mouseSensitivity
-    ) {
-    }
+    ) {}
 }
